@@ -25,6 +25,7 @@ async def lifespan(app: FastAPI):
     logger.info(f"Chrome profile: {settings.chrome_profile_path}")
     logger.info(f"Headless: {settings.headless}")
     logger.info(f"Max concurrent: {settings.max_concurrent}")
+    logger.info(f"Proxy: {settings.proxy or 'none'}")
     yield
     from .captcha.service import get_captcha_service
     svc = get_captcha_service()

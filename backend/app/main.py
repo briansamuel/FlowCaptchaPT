@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    logger.info(f"FlowCaptchaPT v{APP_VERSION} starting...")
     logger.info("Initializing database...")
     await init_db()
     logger.info(f"DB: {settings.database_url}")
@@ -33,10 +34,12 @@ async def lifespan(app: FastAPI):
     logger.info("Shutdown complete")
 
 
+APP_VERSION = "1.1.0"
+
 app = FastAPI(
     title="FlowCaptchaPT",
     description="reCAPTCHA Enterprise Token Service",
-    version="1.0.0",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -64,7 +67,7 @@ app.include_router(logs_router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    return {"status": "ok", "version": APP_VERSION}
 
 
 # Serve frontend static files at /ui/

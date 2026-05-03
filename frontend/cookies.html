@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCaptchaPT - Import Cookies</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <aside class="fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">FlowCaptchaPT</h1>
+            <p class="text-xs text-dark-300 mt-1">Captcha Token Service</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard</a>
+            <a href="keys.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                API Keys</a>
+            <a href="cookies.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                Cookies</a>
+            <a href="logs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Logs</a>
+            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Settings</a>
+            <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                API Docs</a>
+        </nav>
+    </aside>
+
+    <main class="ml-60 p-8 max-w-3xl">
+        <div class="mb-8">
+            <h2 class="text-2xl font-bold text-white">Import Cookies</h2>
+            <p class="text-sm text-dark-300 mt-1">Inject login cookies into Chrome profile for authenticated captcha tokens</p>
+        </div>
+
+        <!-- Instructions -->
+        <div class="bg-dark-800 border border-warning/30 rounded-xl p-5 mb-6">
+            <h3 class="text-sm font-semibold text-warning mb-2">How to get cookies</h3>
+            <ol class="text-sm text-dark-200 space-y-1.5 list-decimal list-inside">
+                <li>Login to <a href="https://labs.google/fx/tools/flow" target="_blank" class="text-accent-light hover:underline cursor-pointer">labs.google/fx/tools/flow</a> in your browser</li>
+                <li>Install <a href="https://chromewebstore.google.com/detail/editthiscookie/fngmhnnpilhplaeedifhccceomclgfbg" target="_blank" class="text-accent-light hover:underline cursor-pointer">EditThisCookie</a> extension</li>
+                <li>Click the extension icon, then "Export" (copies JSON to clipboard)</li>
+                <li>Paste the JSON below and click Import</li>
+            </ol>
+        </div>
+
+        <!-- Cookie Input -->
+        <div class="bg-dark-800 border border-dark-600 rounded-xl p-5 mb-6">
+            <label class="block text-sm font-semibold text-white mb-2" for="cookie-json">Cookie JSON</label>
+            <p class="text-xs text-dark-400 mb-3">Paste the full JSON from EditThisCookie export, or the format: {"url":"...", "cookies":[...]}</p>
+            <textarea id="cookie-json" rows="12" placeholder='[{"name":"SID","value":"...","domain":".google.com",...}]' class="w-full px-4 py-3 bg-dark-700 border border-dark-500 rounded-lg text-white font-mono text-xs placeholder-dark-500 focus:outline-none focus:border-accent resize-y"></textarea>
+        </div>
+
+        <!-- URL override -->
+        <div class="bg-dark-800 border border-dark-600 rounded-xl p-5 mb-6">
+            <label class="block text-sm font-semibold text-white mb-2" for="cookie-url">Target URL (optional)</label>
+            <input id="cookie-url" type="text" value="https://labs.google" placeholder="https://labs.google" class="w-full px-4 py-2.5 bg-dark-700 border border-dark-500 rounded-lg text-white text-sm focus:outline-none focus:border-accent">
+            <p class="text-xs text-dark-400 mt-1">URL domain the cookies belong to</p>
+        </div>
+
+        <!-- API Key Input -->
+        <div class="bg-dark-800 border border-dark-600 rounded-xl p-5 mb-6">
+            <label class="block text-sm font-semibold text-white mb-2" for="api-key-input">API Key</label>
+            <input id="api-key-input" type="text" placeholder="fc_your_api_key_here" class="w-full px-4 py-2.5 bg-dark-700 border border-dark-500 rounded-lg text-white font-mono text-sm placeholder-dark-500 focus:outline-none focus:border-accent">
+            <p class="text-xs text-dark-400 mt-1">Your API key for authentication</p>
+        </div>
+
+        <!-- Import button -->
+        <button onclick="importCookies()" id="import-btn" class="w-full py-3 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer mb-4">
+            Import Cookies
+        </button>
+
+        <!-- Result -->
+        <div id="result" class="hidden bg-dark-800 border rounded-xl p-5">
+            <p id="result-text" class="text-sm"></p>
+        </div>
+
+        <!-- Current cookies preview -->
+        <div class="mt-8 bg-dark-800 border border-dark-600 rounded-xl p-5">
+            <div class="flex items-center justify-between mb-3">
+                <h3 class="text-sm font-semibold text-white">Quick Import Templates</h3>
+            </div>
+            <div class="space-y-2">
+                <button onclick="loadTemplate('labs')" class="w-full text-left px-4 py-3 bg-dark-700 hover:bg-dark-600 rounded-lg text-sm text-dark-200 transition-colors cursor-pointer">
+                    <span class="text-accent-light font-medium">labs.google</span> — Google Labs Flow cookies (for captcha)
+                </button>
+                <button onclick="loadTemplate('google')" class="w-full text-left px-4 py-3 bg-dark-700 hover:bg-dark-600 rounded-lg text-sm text-dark-200 transition-colors cursor-pointer">
+                    <span class="text-accent-light font-medium">google.com</span> — Google account cookies (SID, HSID, etc.)
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+    <script>
+        function loadTemplate(type) {
+            const url = document.getElementById('cookie-url');
+            if (type === 'labs') url.value = 'https://labs.google';
+            else if (type === 'google') url.value = 'https://www.google.com';
+            document.getElementById('cookie-json').focus();
+        }
+
+        function getApiKey() {
+            const input = document.getElementById('api-key-input');
+            let key = input.value.trim();
+            if (!key) {
+                key = localStorage.getItem('fc_api_key') || '';
+                if (key) input.value = key;
+            }
+            if (key) localStorage.setItem('fc_api_key', key);
+            return key;
+        }
+
+        // Restore saved key on load
+        (function() {
+            const saved = localStorage.getItem('fc_api_key');
+            if (saved) document.getElementById('api-key-input').value = saved;
+        })();
+
+        async function importCookies() {
+            const btn = document.getElementById('import-btn');
+            const resultDiv = document.getElementById('result');
+            const resultText = document.getElementById('result-text');
+            const jsonStr = document.getElementById('cookie-json').value.trim();
+            const url = document.getElementById('cookie-url').value.trim();
+
+            if (!jsonStr) {
+                alert('Paste cookie JSON first');
+                return;
+            }
+
+            const apiKey = getApiKey();
+            if (!apiKey) {
+                alert('API key required');
+                return;
+            }
+
+            let payload;
+            try {
+                const parsed = JSON.parse(jsonStr);
+                if (Array.isArray(parsed)) {
+                    payload = {
+                        url: url || 'https://labs.google',
+                        cookies: parsed
+                    };
+                } else if (parsed.cookies) {
+                    payload = parsed;
+                    if (url) payload.url = url;
+                } else {
+                    alert('Invalid format. Expected array of cookies or {url, cookies}');
+                    return;
+                }
+            } catch (e) {
+                alert('Invalid JSON: ' + e.message);
+                return;
+            }
+
+            btn.textContent = 'Importing...';
+            btn.disabled = true;
+            resultDiv.classList.add('hidden');
+
+            try {
+                const res = await fetch('/api/captcha/import-cookies', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-Api-Key': apiKey,
+                    },
+                    body: JSON.stringify(payload),
+                });
+                const data = await res.json();
+
+                resultDiv.classList.remove('hidden');
+                if (data.ok) {
+                    resultDiv.className = 'bg-dark-800 border border-success/30 rounded-xl p-5';
+                    resultText.className = 'text-sm text-success';
+                    resultText.textContent = 'Imported ' + data.imported + ' cookies, verified ' + data.verified + ' in profile.';
+                } else {
+                    resultDiv.className = 'bg-dark-800 border border-danger/30 rounded-xl p-5';
+                    resultText.className = 'text-sm text-danger';
+                    resultText.textContent = data.detail || data.error || 'Import failed';
+                }
+            } catch (e) {
+                resultDiv.classList.remove('hidden');
+                resultDiv.className = 'bg-dark-800 border border-danger/30 rounded-xl p-5';
+                resultText.className = 'text-sm text-danger';
+                resultText.textContent = 'Error: ' + e.message;
+            } finally {
+                btn.textContent = 'Import Cookies';
+                btn.disabled = false;
+            }
+        }
+    </script>
+</body>
+
+</html>

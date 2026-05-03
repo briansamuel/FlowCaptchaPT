@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCaptchaPT - Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <!-- Sidebar -->
+    <aside id="sidebar" class="fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">FlowCaptchaPT</h1>
+            <p class="text-xs text-dark-300 mt-1">Captcha Token Service</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <a href="index.html" class="nav-link active flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer bg-accent/10 text-accent-light">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard
+            </a>
+            <a href="keys.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                API Keys
+            </a>
+            <a href="cookies.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                Cookies
+            </a>
+            <a href="logs.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Logs
+            </a>
+            <a href="settings.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Settings
+            </a>
+            <a href="docs.html" class="nav-link flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                API Docs
+            </a>
+        </nav>
+        <div class="p-3 border-t border-dark-600">
+            <div class="px-3 py-2 text-xs text-dark-400">v1.0.0</div>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-60 p-8">
+        <!-- Header -->
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Dashboard</h2>
+                <p class="text-sm text-dark-300 mt-1">Overview of your captcha service</p>
+            </div>
+            <div class="flex items-center gap-3">
+                <span id="status-dot" class="w-2.5 h-2.5 rounded-full bg-success animate-pulse"></span>
+                <span class="text-sm text-dark-300">Service Online</span>
+            </div>
+        </div>
+
+        <!-- Stats Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 mb-8">
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-dark-300">Total Requests</span>
+                    <svg class="w-5 h-5 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                </div>
+                <p id="stat-total" class="text-3xl font-bold text-white">-</p>
+                <p class="text-xs text-dark-400 mt-1">All time</p>
+            </div>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-dark-300">Today</span>
+                    <svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                </div>
+                <p id="stat-today" class="text-3xl font-bold text-white">-</p>
+                <p class="text-xs text-dark-400 mt-1">Requests today</p>
+            </div>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-dark-300">Success Rate</span>
+                    <svg class="w-5 h-5 text-success" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p id="stat-rate" class="text-3xl font-bold text-white">-</p>
+                <p class="text-xs text-dark-400 mt-1">Overall</p>
+            </div>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-sm text-dark-300">Avg Response</span>
+                    <svg class="w-5 h-5 text-warning" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p id="stat-avg" class="text-3xl font-bold text-white">-</p>
+                <p class="text-xs text-dark-400 mt-1">Milliseconds</p>
+            </div>
+        </div>
+
+        <!-- Bottom row -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-5">
+            <!-- Active Keys -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <h3 class="text-sm font-semibold text-white mb-4">API Keys</h3>
+                <div class="flex items-center gap-4">
+                    <div class="text-center">
+                        <p id="stat-keys" class="text-2xl font-bold text-accent-light">-</p>
+                        <p class="text-xs text-dark-400">Active</p>
+                    </div>
+                    <div class="text-center">
+                        <p id="stat-keys-total" class="text-2xl font-bold text-dark-300">-</p>
+                        <p class="text-xs text-dark-400">Total</p>
+                    </div>
+                </div>
+            </div>
+            <!-- Queue -->
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <h3 class="text-sm font-semibold text-white mb-4">Job Queue</h3>
+                <div id="queue-stats" class="flex items-center gap-4">
+                    <div class="text-center">
+                        <p id="stat-queue" class="text-2xl font-bold text-warning">-</p>
+                        <p class="text-xs text-dark-400">In Queue</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+    <script>
+        async function loadDashboard() {
+            try {
+                const data = await api('/api/dashboard/stats');
+                document.getElementById('stat-total').textContent = data.total_requests.toLocaleString();
+                document.getElementById('stat-today').textContent = data.today_requests.toLocaleString();
+                document.getElementById('stat-rate').textContent = data.success_rate + '%';
+                document.getElementById('stat-avg').textContent = data.avg_response_ms.toLocaleString();
+                document.getElementById('stat-keys').textContent = data.active_keys;
+                document.getElementById('stat-keys-total').textContent = data.total_keys;
+                document.getElementById('stat-queue').textContent = data.queue.total || 0;
+            } catch (e) {
+                console.error('Dashboard load error:', e);
+            }
+        }
+        loadDashboard();
+        setInterval(loadDashboard, 10000);
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,7 @@
+tunnel: 8a5ed565-e838-45d6-a98f-68015d64d8db
+credentials-file: C:\Users\Brian\.cloudflared\8a5ed565-e838-45d6-a98f-68015d64d8db.json
+
+ingress:
+  - hostname: captcha.autosdvn.top
+    service: http://localhost:9339
+  - service: http_status:404

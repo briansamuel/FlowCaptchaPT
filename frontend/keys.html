@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCaptchaPT - API Keys</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <!-- Sidebar (same as index) -->
+    <aside class="fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">FlowCaptchaPT</h1>
+            <p class="text-xs text-dark-300 mt-1">Captcha Token Service</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard</a>
+            <a href="keys.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                API Keys</a>
+            <a href="logs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Logs</a>
+            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Settings</a>
+            <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                API Docs</a>
+        </nav>
+    </aside>
+
+    <main class="ml-60 p-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-white">API Keys</h2>
+                <p class="text-sm text-dark-300 mt-1">Manage access to captcha service</p>
+            </div>
+            <button onclick="showCreateModal()" class="px-4 py-2.5 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-medium transition-colors duration-200 cursor-pointer flex items-center gap-2">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
+                Create Key
+            </button>
+        </div>
+
+        <!-- Keys Table -->
+        <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-dark-600">
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Name</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Key Prefix</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Actions</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Rate Limit</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Requests</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Status</th>
+                        <th class="text-right px-5 py-3 text-dark-300 font-medium">Actions</th>
+                    </tr>
+                </thead>
+                <tbody id="keys-body"></tbody>
+            </table>
+            <div id="keys-empty" class="hidden px-5 py-12 text-center text-dark-400 text-sm">No API keys yet. Create one to get started.</div>
+        </div>
+
+        <!-- New Key Modal (hidden) -->
+        <div id="key-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center">
+            <div class="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-md mx-4">
+                <h3 class="text-lg font-bold text-white mb-4">Create API Key</h3>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-sm text-dark-300 mb-1.5" for="key-name">Name</label>
+                        <input id="key-name" type="text" placeholder="e.g. Production Server" class="w-full px-4 py-2.5 bg-dark-700 border border-dark-500 rounded-lg text-white placeholder-dark-400 focus:outline-none focus:border-accent text-sm">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-dark-300 mb-1.5" for="key-rate">Rate Limit (req/min)</label>
+                        <input id="key-rate" type="number" value="60" min="1" max="1000" class="w-full px-4 py-2.5 bg-dark-700 border border-dark-500 rounded-lg text-white text-sm focus:outline-none focus:border-accent">
+                    </div>
+                    <div>
+                        <label class="block text-sm text-dark-300 mb-1.5" for="key-actions">Allowed Actions</label>
+                        <select id="key-actions" class="w-full px-4 py-2.5 bg-dark-700 border border-dark-500 rounded-lg text-white text-sm focus:outline-none focus:border-accent">
+                            <option value="ALL">ALL (Video + Image)</option>
+                            <option value="VIDEO">VIDEO only</option>
+                            <option value="IMAGE">IMAGE only</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex gap-3 mt-6">
+                    <button onclick="closeModal()" class="flex-1 py-2.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-sm font-medium transition-colors cursor-pointer">Cancel</button>
+                    <button onclick="createKey()" class="flex-1 py-2.5 bg-accent hover:bg-accent-dark text-white rounded-lg text-sm font-medium transition-colors cursor-pointer">Create</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Show Key Modal -->
+        <div id="show-key-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 hidden items-center justify-center">
+            <div class="bg-dark-800 border border-dark-600 rounded-2xl p-6 w-full max-w-lg mx-4">
+                <h3 class="text-lg font-bold text-white mb-2">API Key Created</h3>
+                <p class="text-sm text-warning mb-4">Copy this key now. It won't be shown again.</p>
+                <div class="flex items-center gap-2 bg-dark-700 border border-dark-500 rounded-lg p-3">
+                    <code id="new-key-value" class="flex-1 text-sm text-accent-light break-all font-mono"></code>
+                    <button onclick="copyKey()" class="px-3 py-1.5 bg-accent/20 hover:bg-accent/30 text-accent-light rounded text-xs font-medium transition-colors cursor-pointer">Copy</button>
+                </div>
+                <button onclick="closeShowKey()" class="w-full mt-4 py-2.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded-lg text-sm font-medium transition-colors cursor-pointer">Done</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let _newKey = '';
+
+        async function loadKeys() {
+            try {
+                const keys = await api('/api/keys');
+                const body = document.getElementById('keys-body');
+                const empty = document.getElementById('keys-empty');
+
+                if (!keys.length) {
+                    body.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                empty.classList.add('hidden');
+
+                body.innerHTML = keys.map(k => `
+                <tr class="border-b border-dark-700 hover:bg-dark-700/50 transition-colors">
+                    <td class="px-5 py-3 text-white font-medium">${k.name}</td>
+                    <td class="px-5 py-3 font-mono text-dark-300 text-xs">${k.key_prefix}...</td>
+                    <td class="px-5 py-3"><span class="px-2 py-1 rounded text-xs font-medium ${k.allowed_actions === 'ALL' ? 'bg-accent/20 text-accent-light' : 'bg-warning/20 text-warning'}">${k.allowed_actions}</span></td>
+                    <td class="px-5 py-3 text-dark-200">${k.rate_limit}/min</td>
+                    <td class="px-5 py-3 text-dark-200">${k.total_requests} <span class="text-success text-xs">(${k.success_count} ok)</span></td>
+                    <td class="px-5 py-3">
+                        <span class="px-2 py-1 rounded text-xs font-medium ${k.is_active ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}">${k.is_active ? 'Active' : 'Disabled'}</span>
+                    </td>
+                    <td class="px-5 py-3 text-right">
+                        <button onclick="toggleKey('${k.id}')" class="px-2 py-1 text-xs text-dark-300 hover:text-white transition-colors cursor-pointer">${k.is_active ? 'Disable' : 'Enable'}</button>
+                        <button onclick="deleteKey('${k.id}','${k.name}')" class="px-2 py-1 text-xs text-danger hover:text-red-300 transition-colors cursor-pointer ml-1">Delete</button>
+                    </td>
+                </tr>
+            `).join('');
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function showCreateModal() {
+            document.getElementById('key-modal').classList.remove('hidden');
+            document.getElementById('key-modal').classList.add('flex');
+        }
+
+        function closeModal() {
+            document.getElementById('key-modal').classList.add('hidden');
+            document.getElementById('key-modal').classList.remove('flex');
+        }
+
+        async function createKey() {
+            const name = document.getElementById('key-name').value.trim();
+            if (!name) return;
+            const data = await api('/api/keys', {
+                method: 'POST',
+                body: JSON.stringify({
+                    name,
+                    rate_limit: parseInt(document.getElementById('key-rate').value) || 60,
+                    allowed_actions: document.getElementById('key-actions').value,
+                }),
+            });
+            closeModal();
+            _newKey = data.key;
+            document.getElementById('new-key-value').textContent = data.key;
+            document.getElementById('show-key-modal').classList.remove('hidden');
+            document.getElementById('show-key-modal').classList.add('flex');
+            loadKeys();
+        }
+
+        function copyKey() {
+            navigator.clipboard.writeText(_newKey);
+        }
+
+        function closeShowKey() {
+            document.getElementById('show-key-modal').classList.add('hidden');
+            document.getElementById('show-key-modal').classList.remove('flex');
+        }
+
+        async function toggleKey(id) {
+            await api(`/api/keys/${id}/toggle`, {
+                method: 'PUT'
+            });
+            loadKeys();
+        }
+        async function deleteKey(id, name) {
+            if (!confirm(`Delete key "${name}"?`)) return;
+            await api(`/api/keys/${id}`, {
+                method: 'DELETE'
+            });
+            loadKeys();
+        }
+
+        loadKeys();
+    </script>
+</body>
+
+</html>

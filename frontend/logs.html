@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCaptchaPT - Logs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <aside class="fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">FlowCaptchaPT</h1>
+            <p class="text-xs text-dark-300 mt-1">Captcha Token Service</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard</a>
+            <a href="keys.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                API Keys</a>
+            <a href="logs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Logs</a>
+            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Settings</a>
+            <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                API Docs</a>
+        </nav>
+    </aside>
+
+    <main class="ml-60 p-8">
+        <div class="flex items-center justify-between mb-8">
+            <div>
+                <h2 class="text-2xl font-bold text-white">Usage Logs</h2>
+                <p class="text-sm text-dark-300 mt-1">Recent captcha requests</p>
+            </div>
+            <div class="flex gap-2">
+                <select id="filter-action" onchange="loadLogs()" class="px-3 py-2 bg-dark-700 border border-dark-500 rounded-lg text-sm text-white focus:outline-none focus:border-accent cursor-pointer">
+                    <option value="">All Actions</option>
+                    <option value="VIDEO_GENERATION">Video</option>
+                    <option value="IMAGE_GENERATION">Image</option>
+                </select>
+                <select id="filter-success" onchange="loadLogs()" class="px-3 py-2 bg-dark-700 border border-dark-500 rounded-lg text-sm text-white focus:outline-none focus:border-accent cursor-pointer">
+                    <option value="">All Status</option>
+                    <option value="true">Success</option>
+                    <option value="false">Failed</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+            <table class="w-full text-sm">
+                <thead>
+                    <tr class="border-b border-dark-600">
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Time</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Action</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Status</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Token</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">IP</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Time (ms)</th>
+                        <th class="text-left px-5 py-3 text-dark-300 font-medium">Callback</th>
+                    </tr>
+                </thead>
+                <tbody id="logs-body"></tbody>
+            </table>
+            <div id="logs-empty" class="hidden px-5 py-12 text-center text-dark-400 text-sm">No logs yet.</div>
+        </div>
+
+        <div class="flex items-center justify-between mt-4">
+            <p id="logs-info" class="text-sm text-dark-400"></p>
+            <div class="flex gap-2">
+                <button id="prev-btn" onclick="changePage(-1)" class="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded text-sm transition-colors cursor-pointer disabled:opacity-50" disabled>Prev</button>
+                <button id="next-btn" onclick="changePage(1)" class="px-3 py-1.5 bg-dark-700 hover:bg-dark-600 text-dark-200 rounded text-sm transition-colors cursor-pointer disabled:opacity-50">Next</button>
+            </div>
+        </div>
+    </main>
+
+    <script src="assets/app.js"></script>
+    <script>
+        let currentPage = 1;
+        const limit = 50;
+
+        async function loadLogs() {
+            const action = document.getElementById('filter-action').value;
+            const success = document.getElementById('filter-success').value;
+            let url = `/api/logs?page=${currentPage}&limit=${limit}`;
+            if (action) url += `&action=${action}`;
+            if (success) url += `&success=${success}`;
+
+            try {
+                const data = await api(url);
+                const body = document.getElementById('logs-body');
+                const empty = document.getElementById('logs-empty');
+
+                if (!data.items.length) {
+                    body.innerHTML = '';
+                    empty.classList.remove('hidden');
+                    return;
+                }
+                empty.classList.add('hidden');
+
+                body.innerHTML = data.items.map(l => {
+                    const dt = new Date(l.created_at + 'Z');
+                    const time = dt.toLocaleString();
+                    return `
+                <tr class="border-b border-dark-700 hover:bg-dark-700/50 transition-colors">
+                    <td class="px-5 py-3 text-dark-300 text-xs">${time}</td>
+                    <td class="px-5 py-3"><span class="px-2 py-1 rounded text-xs font-medium ${l.action.includes('VIDEO') ? 'bg-accent/20 text-accent-light' : 'bg-warning/20 text-warning'}">${l.action.includes('VIDEO') ? 'Video' : 'Image'}</span></td>
+                    <td class="px-5 py-3"><span class="px-2 py-1 rounded text-xs font-medium ${l.success ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}">${l.success ? 'OK' : 'Fail'}</span></td>
+                    <td class="px-5 py-3 font-mono text-xs text-dark-300">${l.token_preview || '-'}</td>
+                    <td class="px-5 py-3 text-dark-300 text-xs">${l.ip_address || '-'}</td>
+                    <td class="px-5 py-3 text-dark-200">${l.response_time_ms || '-'}</td>
+                    <td class="px-5 py-3 text-xs ${l.callback_result === 'success' ? 'text-success' : l.callback_result === 'failed' ? 'text-danger' : 'text-dark-400'}">${l.callback_result || '-'}</td>
+                </tr>`;
+                }).join('');
+
+                document.getElementById('logs-info').textContent = `${data.total} total, page ${data.page}`;
+                document.getElementById('prev-btn').disabled = currentPage <= 1;
+                document.getElementById('next-btn').disabled = data.items.length < limit;
+            } catch (e) {
+                console.error(e);
+            }
+        }
+
+        function changePage(delta) {
+            currentPage = Math.max(1, currentPage + delta);
+            loadLogs();
+        }
+        loadLogs();
+        setInterval(loadLogs, 15000);
+    </script>
+</body>
+
+</html>

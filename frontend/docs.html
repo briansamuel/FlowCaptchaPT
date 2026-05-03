@@ -1,0 +1,879 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FlowCaptchaPT - API Docs</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            padding: 16px;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #c9d1d9;
+        }
+
+        .code-block .kw {
+            color: #ff7b72;
+        }
+
+        .code-block .str {
+            color: #a5d6ff;
+        }
+
+        .code-block .cm {
+            color: #8b949e;
+        }
+
+        .code-block .num {
+            color: #79c0ff;
+        }
+
+        .method-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .method-post {
+            background: #22c55e20;
+            color: #22c55e;
+        }
+
+        .method-get {
+            background: #3b82f620;
+            color: #3b82f6;
+        }
+
+        .method-put {
+            background: #f59e0b20;
+            color: #f59e0b;
+        }
+
+        .method-delete {
+            background: #ef444420;
+            color: #ef4444;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+    </style>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <!-- Sidebar -->
+    <aside class="fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">FlowCaptchaPT</h1>
+            <p class="text-xs text-dark-300 mt-1">Captcha Token Service</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-1">
+            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard</a>
+            <a href="keys.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" /></svg>
+                API Keys</a>
+            <a href="logs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" /></svg>
+                Logs</a>
+            <a href="settings.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                Settings</a>
+            <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                API Docs</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="ml-60 p-8 max-w-4xl">
+        <div class="mb-10">
+            <h2 class="text-3xl font-bold text-white">API Documentation</h2>
+            <p class="text-dark-300 mt-2">FlowCaptchaPT v1.0.0 &mdash; reCAPTCHA Enterprise Token Service</p>
+        </div>
+
+        <!-- Table of Contents -->
+        <div class="bg-dark-800 border border-dark-600 rounded-xl p-5 mb-10">
+            <h3 class="text-sm font-semibold text-white mb-3">Table of Contents</h3>
+            <div class="grid grid-cols-2 gap-2 text-sm">
+                <a href="#auth" class="text-accent-light hover:text-white transition-colors cursor-pointer">Authentication</a>
+                <a href="#errors" class="text-accent-light hover:text-white transition-colors cursor-pointer">Error Handling</a>
+                <a href="#get-token" class="text-accent-light hover:text-white transition-colors cursor-pointer">Get Captcha Token</a>
+                <a href="#poll-job" class="text-accent-light hover:text-white transition-colors cursor-pointer">Poll Job Status</a>
+                <a href="#callback" class="text-accent-light hover:text-white transition-colors cursor-pointer">Token Callback</a>
+                <a href="#create-key" class="text-accent-light hover:text-white transition-colors cursor-pointer">Create API Key</a>
+                <a href="#list-keys" class="text-accent-light hover:text-white transition-colors cursor-pointer">List API Keys</a>
+                <a href="#toggle-key" class="text-accent-light hover:text-white transition-colors cursor-pointer">Toggle API Key</a>
+                <a href="#delete-key" class="text-accent-light hover:text-white transition-colors cursor-pointer">Delete API Key</a>
+                <a href="#get-settings" class="text-accent-light hover:text-white transition-colors cursor-pointer">Get Settings</a>
+                <a href="#update-settings" class="text-accent-light hover:text-white transition-colors cursor-pointer">Update Settings</a>
+                <a href="#dashboard" class="text-accent-light hover:text-white transition-colors cursor-pointer">Dashboard Stats</a>
+                <a href="#logs" class="text-accent-light hover:text-white transition-colors cursor-pointer">Usage Logs</a>
+                <a href="#health" class="text-accent-light hover:text-white transition-colors cursor-pointer">Health Check</a>
+            </div>
+        </div>
+
+        <!-- ============ AUTHENTICATION ============ -->
+        <section id="auth" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Authentication</h3>
+            <p class="text-dark-200 text-sm mb-4">FlowCaptchaPT uses two authentication methods:</p>
+
+            <div class="space-y-4">
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                    <h4 class="text-sm font-semibold text-accent-light mb-2">API Key (Public endpoints)</h4>
+                    <p class="text-dark-300 text-sm mb-3">Used for captcha token requests. Pass via header:</p>
+                    <div class="code-block">
+                        <pre>X-Api-Key: fc_your_api_key_here</pre>
+                    </div>
+                    <p class="text-dark-400 text-xs mt-2">API keys start with <code class="text-accent-light font-mono">fc_</code> prefix.</p>
+                </div>
+
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                    <h4 class="text-sm font-semibold text-warning mb-2">Admin Token (Management endpoints)</h4>
+                    <p class="text-dark-300 text-sm mb-3">Used for API key management, settings, logs. Pass via header:</p>
+                    <div class="code-block">
+                        <pre>Authorization: Bearer your_admin_token</pre>
+                    </div>
+                    <p class="text-dark-400 text-xs mt-2">Default: <code class="text-warning font-mono">flowcaptcha-admin-2024</code>. Change via <code class="font-mono">FC_ADMIN_TOKEN</code> env.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ERROR HANDLING ============ -->
+        <section id="errors" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Error Handling</h3>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Code</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-warning">401</td>
+                            <td class="px-5 py-2.5 text-dark-200">Missing or invalid authentication</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-warning">403</td>
+                            <td class="px-5 py-2.5 text-dark-200">API key disabled, expired, or action not allowed</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-danger">429</td>
+                            <td class="px-5 py-2.5 text-dark-200">Rate limit exceeded (per API key, per minute)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-danger">404</td>
+                            <td class="px-5 py-2.5 text-dark-200">Resource not found (job, key, log)</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-danger">422</td>
+                            <td class="px-5 py-2.5 text-dark-200">Validation error (invalid request body)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            <div class="code-block mt-4">
+                <pre><span class="cm">// Error response format</span>
+{
+  "<span class="str">detail</span>": "<span class="str">Rate limit exceeded (60/min)</span>"
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ GET CAPTCHA TOKEN ============ -->
+        <section id="get-token" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/captcha</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Get a reCAPTCHA Enterprise token for Google Flow. This is the primary endpoint for external services.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Headers</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light w-48">X-Api-Key</td>
+                            <td class="px-5 py-2.5 text-dark-200">Required. Your API key</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">action</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">VIDEO_GENERATION</code> or <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">IMAGE_GENERATION</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">token</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200">reCAPTCHA token (null if failed/queued)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">success</td>
+                            <td class="px-5 py-2.5 text-dark-300">boolean</td>
+                            <td class="px-5 py-2.5 text-dark-200">Whether token was extracted</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">status</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200"><code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">completed</code>, <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">failed</code>, or <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">pending</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">error</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200">Error message if failed</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">job_id</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200">Job ID if request was queued (poll with GET /api/captcha/jobs/{job_id})</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">callback_url</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200">URL to report token result (only on success)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Example</h4>
+            <div class="code-block">
+                <pre><span class="cm"># Request</span>
+curl -X POST http://localhost:8899/api/captcha \
+  -H "<span class="str">X-Api-Key: fc_your_key_here</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"action": "VIDEO_GENERATION"}</span>'
+
+<span class="cm"># Success Response (200)</span>
+{
+  "<span class="str">token</span>": "<span class="str">03AFcWeA7z6LId-dQ_VVTL0HU9Za3...</span>",
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">status</span>": "<span class="str">completed</span>",
+  "<span class="str">callback_url</span>": "<span class="str">http://localhost:8899/api/captcha/callback/uuid-here</span>",
+  "<span class="str">error</span>": <span class="kw">null</span>,
+  "<span class="str">job_id</span>": <span class="kw">null</span>
+}
+
+<span class="cm"># Queued Response (200) - service busy</span>
+{
+  "<span class="str">token</span>": <span class="kw">null</span>,
+  "<span class="str">success</span>": <span class="kw">false</span>,
+  "<span class="str">status</span>": "<span class="str">pending</span>",
+  "<span class="str">error</span>": "<span class="str">Service busy, job queued</span>",
+  "<span class="str">job_id</span>": "<span class="str">ad83b729-xxxx-xxxx-xxxx-xxxxxxxxxxxx</span>",
+  "<span class="str">callback_url</span>": <span class="kw">null</span>
+}</pre>
+            </div>
+
+            <div class="bg-dark-800 border border-info/30 rounded-xl p-4 mt-4">
+                <p class="text-sm text-info">When <code class="font-mono">job_id</code> is returned, poll <code class="font-mono">GET /api/captcha/jobs/{job_id}</code> until status is <code class="font-mono">completed</code> or <code class="font-mono">failed</code>.</p>
+            </div>
+        </section>
+
+        <!-- ============ POLL JOB ============ -->
+        <section id="poll-job" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/captcha/jobs/{job_id}</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Poll the status of a queued captcha job. No authentication required.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <div class="code-block">
+                <pre><span class="cm"># Pending</span>
+{ "<span class="str">job_id</span>": "<span class="str">uuid</span>", "<span class="str">status</span>": "<span class="str">pending</span>", "<span class="str">token</span>": <span class="kw">null</span>, "<span class="str">success</span>": <span class="kw">false</span>, "<span class="str">elapsed_ms</span>": <span class="num">5200</span> }
+
+<span class="cm"># Completed</span>
+{ "<span class="str">job_id</span>": "<span class="str">uuid</span>", "<span class="str">status</span>": "<span class="str">completed</span>", "<span class="str">token</span>": "<span class="str">03AFcWeA7z...</span>", "<span class="str">success</span>": <span class="kw">true</span>, "<span class="str">elapsed_ms</span>": <span class="num">12400</span> }
+
+<span class="cm"># Failed / Timeout</span>
+{ "<span class="str">job_id</span>": "<span class="str">uuid</span>", "<span class="str">status</span>": "<span class="str">timeout</span>", "<span class="str">error</span>": "<span class="str">Timeout after 120s</span>", "<span class="str">success</span>": <span class="kw">false</span> }</pre>
+            </div>
+            <p class="text-dark-400 text-xs mt-2">Possible statuses: <code class="font-mono">pending</code>, <code class="font-mono">processing</code>, <code class="font-mono">completed</code>, <code class="font-mono">failed</code>, <code class="font-mono">timeout</code>. Jobs expire after 5 minutes.</p>
+        </section>
+
+        <!-- ============ CALLBACK ============ -->
+        <section id="callback" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/captcha/callback/{log_id}</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Report whether the captcha token worked. The <code class="font-mono">callback_url</code> is provided in the token response.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">result</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">success</code> or <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">failed</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">error</td>
+                            <td class="px-5 py-2.5 text-dark-300">string|null</td>
+                            <td class="px-5 py-2.5 text-dark-200">Optional error code (e.g. <code class="font-mono text-xs">CAPTCHA_FAILED</code>, <code class="font-mono text-xs">TOKEN_EXPIRED</code>)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="code-block">
+                <pre>curl -X POST http://localhost:8899/api/captcha/callback/uuid-here \
+  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"result": "success"}</span>'
+
+<span class="cm"># Response</span>
+{ "<span class="str">ok</span>": <span class="kw">true</span>, "<span class="str">message</span>": "<span class="str">Callback recorded: success</span>" }</pre>
+            </div>
+        </section>
+
+        <!-- ============ CREATE API KEY ============ -->
+        <section id="create-key" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/keys</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Create a new API key. The raw key is only shown once in the response.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Default</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">name</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-400">required</td>
+                            <td class="px-5 py-2.5 text-dark-200">Display name for the key</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">rate_limit</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">60</td>
+                            <td class="px-5 py-2.5 text-dark-200">Max requests per minute</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">allowed_actions</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-400">ALL</td>
+                            <td class="px-5 py-2.5 text-dark-200"><code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">ALL</code>, <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">VIDEO</code>, or <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">IMAGE</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="code-block">
+                <pre>curl -X POST http://localhost:8899/api/keys \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"name": "Production", "rate_limit": 120, "allowed_actions": "ALL"}</span>'
+
+<span class="cm"># Response - save the key! Only shown once.</span>
+{
+  "<span class="str">id</span>": "<span class="str">uuid</span>",
+  "<span class="str">name</span>": "<span class="str">Production</span>",
+  "<span class="str">key</span>": "<span class="str">fc_aBcDeFgHiJkLmNoPqRsTuVwXyZ012345678901234</span>",
+  "<span class="str">key_prefix</span>": "<span class="str">fc_aBcDeFgH</span>",
+  "<span class="str">rate_limit</span>": <span class="num">120</span>,
+  "<span class="str">allowed_actions</span>": "<span class="str">ALL</span>"
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ LIST KEYS ============ -->
+        <section id="list-keys" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/keys</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">List all API keys with usage statistics.</p>
+
+            <div class="code-block">
+                <pre>curl http://localhost:8899/api/keys \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+[
+  {
+    "<span class="str">id</span>": "<span class="str">uuid</span>",
+    "<span class="str">name</span>": "<span class="str">Production</span>",
+    "<span class="str">key_prefix</span>": "<span class="str">fc_aBcDeFgH</span>",
+    "<span class="str">is_active</span>": <span class="kw">true</span>,
+    "<span class="str">rate_limit</span>": <span class="num">120</span>,
+    "<span class="str">allowed_actions</span>": "<span class="str">ALL</span>",
+    "<span class="str">created_at</span>": "<span class="str">2024-01-15T10:30:00</span>",
+    "<span class="str">total_requests</span>": <span class="num">1542</span>,
+    "<span class="str">success_count</span>": <span class="num">1480</span>
+  }
+]</pre>
+            </div>
+        </section>
+
+        <!-- ============ TOGGLE KEY ============ -->
+        <section id="toggle-key" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-put">PUT</span>
+                <code class="text-white font-mono text-lg">/api/keys/{key_id}/toggle</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Enable or disable an API key.</p>
+            <div class="code-block">
+                <pre>curl -X PUT http://localhost:8899/api/keys/uuid-here/toggle \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+{ "<span class="str">id</span>": "<span class="str">uuid</span>", "<span class="str">is_active</span>": <span class="kw">false</span> }</pre>
+            </div>
+        </section>
+
+        <!-- ============ DELETE KEY ============ -->
+        <section id="delete-key" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-delete">DELETE</span>
+                <code class="text-white font-mono text-lg">/api/keys/{key_id}</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Permanently delete an API key and revoke access.</p>
+            <div class="code-block">
+                <pre>curl -X DELETE http://localhost:8899/api/keys/uuid-here \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+{ "<span class="str">ok</span>": <span class="kw">true</span> }</pre>
+            </div>
+        </section>
+
+        <!-- ============ GET SETTINGS ============ -->
+        <section id="get-settings" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/settings</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Get current runtime settings.</p>
+            <div class="code-block">
+                <pre>curl http://localhost:8899/api/settings \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+{
+  "<span class="str">headless</span>": <span class="kw">true</span>,
+  "<span class="str">max_concurrent</span>": <span class="num">3</span>,
+  "<span class="str">cooldown</span>": <span class="num">10</span>,
+  "<span class="str">cooldown_fail</span>": <span class="num">120</span>,
+  "<span class="str">wait_delay</span>": <span class="num">0</span>
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ UPDATE SETTINGS ============ -->
+        <section id="update-settings" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-put">PUT</span>
+                <code class="text-white font-mono text-lg">/api/settings</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Update runtime settings. All fields are optional, only provided fields are updated.</p>
+
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Range</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">headless</td>
+                            <td class="px-5 py-2.5 text-dark-300">boolean</td>
+                            <td class="px-5 py-2.5 text-dark-400">-</td>
+                            <td class="px-5 py-2.5 text-dark-200">Run Chrome without visible window</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">max_concurrent</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">1-10</td>
+                            <td class="px-5 py-2.5 text-dark-200">Max simultaneous browser instances</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">cooldown</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">0-300s</td>
+                            <td class="px-5 py-2.5 text-dark-200">Delay after successful extraction</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">cooldown_fail</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">0-600s</td>
+                            <td class="px-5 py-2.5 text-dark-200">Delay after failed extraction</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">wait_delay</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">0-60s</td>
+                            <td class="px-5 py-2.5 text-dark-200">Wait after page load before extracting token</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="code-block">
+                <pre>curl -X PUT http://localhost:8899/api/settings \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"cooldown": 5, "max_concurrent": 5}</span>'</pre>
+            </div>
+        </section>
+
+        <!-- ============ DASHBOARD ============ -->
+        <section id="dashboard" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/dashboard/stats</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Get service statistics and queue status.</p>
+            <div class="code-block">
+                <pre>curl http://localhost:8899/api/dashboard/stats \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+{
+  "<span class="str">total_keys</span>": <span class="num">3</span>,
+  "<span class="str">active_keys</span>": <span class="num">2</span>,
+  "<span class="str">total_requests</span>": <span class="num">1542</span>,
+  "<span class="str">today_requests</span>": <span class="num">87</span>,
+  "<span class="str">hour_requests</span>": <span class="num">12</span>,
+  "<span class="str">success_rate</span>": <span class="num">96.1</span>,
+  "<span class="str">avg_response_ms</span>": <span class="num">3850</span>,
+  "<span class="str">queue</span>": { "<span class="str">total</span>": <span class="num">0</span> }
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ LOGS ============ -->
+        <section id="logs" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/logs</code>
+                <span class="text-xs text-warning bg-warning/10 px-2 py-0.5 rounded">Admin</span>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Get paginated usage logs with optional filters.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Query Parameters</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Param</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Default</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">page</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">1</td>
+                            <td class="px-5 py-2.5 text-dark-200">Page number (starts at 1)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">limit</td>
+                            <td class="px-5 py-2.5 text-dark-300">integer</td>
+                            <td class="px-5 py-2.5 text-dark-400">50</td>
+                            <td class="px-5 py-2.5 text-dark-200">Items per page (1-200)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">action</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-400">-</td>
+                            <td class="px-5 py-2.5 text-dark-200">Filter: <code class="font-mono text-xs">VIDEO_GENERATION</code> or <code class="font-mono text-xs">IMAGE_GENERATION</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">success</td>
+                            <td class="px-5 py-2.5 text-dark-300">boolean</td>
+                            <td class="px-5 py-2.5 text-dark-400">-</td>
+                            <td class="px-5 py-2.5 text-dark-200">Filter: <code class="font-mono text-xs">true</code> or <code class="font-mono text-xs">false</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="code-block">
+                <pre>curl "<span class="str">http://localhost:8899/api/logs?page=1&amp;limit=20&amp;success=true</span>" \
+  -H "<span class="str">Authorization: Bearer flowcaptcha-admin-2024</span>"
+
+<span class="cm"># Response</span>
+{
+  "<span class="str">total</span>": <span class="num">1480</span>,
+  "<span class="str">page</span>": <span class="num">1</span>,
+  "<span class="str">limit</span>": <span class="num">20</span>,
+  "<span class="str">items</span>": [
+    {
+      "<span class="str">id</span>": "<span class="str">uuid</span>",
+      "<span class="str">api_key_id</span>": "<span class="str">uuid</span>",
+      "<span class="str">action</span>": "<span class="str">VIDEO_GENERATION</span>",
+      "<span class="str">success</span>": <span class="kw">true</span>,
+      "<span class="str">error</span>": <span class="kw">null</span>,
+      "<span class="str">token_preview</span>": "<span class="str">03AFcWeA7z6LId-dQ_VV</span>",
+      "<span class="str">ip_address</span>": "<span class="str">127.0.0.1</span>",
+      "<span class="str">response_time_ms</span>": <span class="num">3920</span>,
+      "<span class="str">callback_result</span>": "<span class="str">success</span>",
+      "<span class="str">created_at</span>": "<span class="str">2024-01-15T10:30:00</span>"
+    }
+  ]
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ HEALTH ============ -->
+        <section id="health" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-get">GET</span>
+                <code class="text-white font-mono text-lg">/api/health</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Health check endpoint. No authentication required.</p>
+            <div class="code-block">
+                <pre>curl http://localhost:8899/api/health
+
+<span class="cm"># Response</span>
+{ "<span class="str">status</span>": "<span class="str">ok</span>", "<span class="str">version</span>": "<span class="str">1.0.0</span>" }</pre>
+            </div>
+        </section>
+
+        <!-- ============ CODE EXAMPLES ============ -->
+        <section id="examples" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Code Examples</h3>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Python</h4>
+            <div class="code-block mb-6">
+                <pre><span class="kw">import</span> requests
+
+BASE = <span class="str">"http://your-server:8899"</span>
+KEY = <span class="str">"fc_your_api_key"</span>
+
+<span class="cm"># Get video token</span>
+resp = requests.post(
+    f<span class="str">"{BASE}/api/captcha"</span>,
+    json={<span class="str">"action"</span>: <span class="str">"VIDEO_GENERATION"</span>},
+    headers={<span class="str">"X-Api-Key"</span>: KEY},
+)
+data = resp.json()
+
+<span class="kw">if</span> data[<span class="str">"success"</span>]:
+    token = data[<span class="str">"token"</span>]
+    print(f<span class="str">"Token: {token[:50]}..."</span>)
+
+    <span class="cm"># Report callback</span>
+    requests.post(
+        data[<span class="str">"callback_url"</span>],
+        json={<span class="str">"result"</span>: <span class="str">"success"</span>},
+        headers={<span class="str">"X-Api-Key"</span>: KEY},
+    )
+
+<span class="kw">elif</span> data.get(<span class="str">"job_id"</span>):
+    <span class="cm"># Poll for result</span>
+    <span class="kw">import</span> time
+    <span class="kw">while True</span>:
+        job = requests.get(f<span class="str">"{BASE}/api/captcha/jobs/{data['job_id']}"</span>).json()
+        <span class="kw">if</span> job[<span class="str">"status"</span>] <span class="kw">in</span> (<span class="str">"completed"</span>, <span class="str">"failed"</span>, <span class="str">"timeout"</span>):
+            print(job)
+            <span class="kw">break</span>
+        time.sleep(<span class="num">3</span>)</pre>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">JavaScript (Node.js)</h4>
+            <div class="code-block mb-6">
+                <pre><span class="kw">const</span> BASE = <span class="str">"http://your-server:8899"</span>;
+<span class="kw">const</span> KEY = <span class="str">"fc_your_api_key"</span>;
+
+<span class="kw">async function</span> getCaptchaToken(action = <span class="str">"VIDEO_GENERATION"</span>) {
+  <span class="kw">const</span> res = <span class="kw">await</span> fetch(`${BASE}/api/captcha`, {
+    method: <span class="str">"POST"</span>,
+    headers: { <span class="str">"X-Api-Key"</span>: KEY, <span class="str">"Content-Type"</span>: <span class="str">"application/json"</span> },
+    body: JSON.stringify({ action }),
+  });
+  <span class="kw">const</span> data = <span class="kw">await</span> res.json();
+
+  <span class="kw">if</span> (data.success) {
+    console.log(<span class="str">"Token:"</span>, data.token.slice(<span class="num">0</span>, <span class="num">50</span>) + <span class="str">"..."</span>);
+    <span class="kw">return</span> data.token;
+  }
+
+  <span class="cm">// If queued, poll for result</span>
+  <span class="kw">if</span> (data.job_id) {
+    <span class="kw">while</span> (<span class="kw">true</span>) {
+      <span class="kw">const</span> job = <span class="kw">await</span> fetch(`${BASE}/api/captcha/jobs/${data.job_id}`).then(r => r.json());
+      <span class="kw">if</span> ([<span class="str">"completed"</span>, <span class="str">"failed"</span>, <span class="str">"timeout"</span>].includes(job.status)) <span class="kw">return</span> job.token;
+      <span class="kw">await</span> <span class="kw">new</span> Promise(r => setTimeout(r, <span class="num">3000</span>));
+    }
+  }
+  <span class="kw">throw new</span> Error(data.error || <span class="str">"Failed"</span>);
+}</pre>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">cURL</h4>
+            <div class="code-block">
+                <pre><span class="cm"># Get video token</span>
+curl -X POST http://your-server:8899/api/captcha \
+  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"action": "VIDEO_GENERATION"}</span>'
+
+<span class="cm"># Get image token</span>
+curl -X POST http://your-server:8899/api/captcha \
+  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"action": "IMAGE_GENERATION"}</span>'</pre>
+            </div>
+        </section>
+
+        <footer class="border-t border-dark-700 pt-6 pb-12 text-center text-dark-400 text-xs">
+            FlowCaptchaPT v1.0.0 &mdash; reCAPTCHA Enterprise Token Service
+        </footer>
+    </main>
+</body>
+
+</html>
+r => r.json());
+<span class="kw">if</span> ([<span class="str">"completed"</span>, <span class="str">"failed"</span>, <span class="str">"timeout"</span>].includes(job.status)) <span class="kw">return</span> job.token;
+<span class="kw">await</span> <span class="kw">new</span> Promise(r => setTimeout(r, <span class="num">3000</span>));
+}
+}
+<span class="kw">throw new</span> Error(data.error || <span class="str">"Failed"</span>);
+}</pre>
+</div>
+
+<h4 class="text-sm font-semibold text-dark-200 mb-2">cURL</h4>
+<div class="code-block">
+    <pre><span class="cm"># Get video token</span>
+curl -X POST http://your-server:8899/api/captcha \
+  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"action": "VIDEO_GENERATION"}</span>'
+
+<span class="cm"># Get image token</span>
+curl -X POST http://your-server:8899/api/captcha \
+  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '<span class="str">{"action": "IMAGE_GENERATION"}</span>'</pre>
+</div>
+</section>
+
+<footer class="border-t border-dark-700 pt-6 pb-12 text-center text-dark-400 text-xs">
+    FlowCaptchaPT v1.0.0 &mdash; reCAPTCHA Enterprise Token Service
+</footer>
+</main>
+</body>
+
+</html>

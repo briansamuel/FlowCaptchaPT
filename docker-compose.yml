@@ -17,6 +17,7 @@ services:
       - FC_DEFAULT_COOLDOWN=0
       - FC_DEFAULT_COOLDOWN_FAIL=120
       - FC_DEFAULT_WAIT_DELAY=3
+      - FC_PROXY=http://muaproxy69e7138ad6df2:QXHMy8AbCAmkT9pU@1.52.178.2:22597
       - FC_HOST=0.0.0.0
       - FC_PORT=9339
     restart: unless-stopped

@@ -33,9 +33,10 @@ class CaptchaResult:
 class CaptchaService:
     """Non-headless Chrome + raw CDP. Chrome stays alive, reuses warm tab."""
 
-    def __init__(self, profile_dir: str, headless: bool = False):
+    def __init__(self, profile_dir: str, headless: bool = False, proxy: str = ""):
         self.profile_dir = profile_dir
         self.headless = headless
+        self.proxy = proxy
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._cooldown_until: float = 0
         self.cooldown: int = 10
@@ -160,6 +161,10 @@ class CaptchaService:
 
             if self.headless:
                 args.append("--headless=new")
+
+            if self.proxy:
+                args.append(f"--proxy-server={self.proxy}")
+                logger.info(f"Using proxy: {self.proxy}")
 
             args.append(TARGET_URL)
 
@@ -437,6 +442,7 @@ def get_captcha_service() -> CaptchaService:
         _instance = CaptchaService(
             profile_dir=str(settings.chrome_profile_path),
             headless=settings.headless,
+            proxy=settings.proxy,
         )
         _instance.set_concurrency(settings.max_concurrent)
         _instance.cooldown = settings.default_cooldown

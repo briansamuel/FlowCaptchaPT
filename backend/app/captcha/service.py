@@ -135,7 +135,6 @@ class CaptchaService:
                 "--disable-setuid-sandbox",
                 "--password-store=basic",
                 "--disable-dev-shm-usage",
-                "--disable-extensions",
                 "--disable-default-apps",
                 "--disable-sync",
                 "--disable-translate",
@@ -153,8 +152,19 @@ class CaptchaService:
                 args.append("--headless=new")
 
             if self.proxy:
-                args.append(f"--proxy-server={self.proxy}")
-                logger.info(f"Using proxy: {self.proxy}")
+                from .proxy_ext import create_proxy_extension, parse_proxy_url
+                proxy_info = parse_proxy_url(self.proxy)
+                if proxy_info["username"]:
+                    # Use extension for authenticated proxy
+                    ext_dir = os.path.join(self.profile_dir, "proxy_ext")
+                    create_proxy_extension(self.proxy, ext_dir)
+                    # Remove --disable-extensions if present, add extension load
+                    args = [a for a in args if a != "--disable-extensions"]
+                    args.append(f"--load-extension={ext_dir}")
+                    logger.info(f"Using proxy extension: {proxy_info['host']}:{proxy_info['port']}")
+                else:
+                    args.append(f"--proxy-server={self.proxy}")
+                    logger.info(f"Using proxy: {self.proxy}")
 
             args.append(TARGET_URL)
 

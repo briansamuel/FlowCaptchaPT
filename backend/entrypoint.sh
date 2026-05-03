@@ -2,7 +2,7 @@
 # Start Xvfb virtual display, then run the app
 
 # Start Xvfb on display :99
-Xvfb :99 -screen 0 1280x720x24 -nolisten tcp &
+Xvfb :99 -screen 0 1920x1080x24 -nolisten tcp &
 XVFB_PID=$!
 export DISPLAY=:99
 

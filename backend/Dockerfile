@@ -7,6 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget gnupg2 curl unzip procps \
     # Xvfb for virtual display
     xvfb \
+    # dbus for Chrome
+    dbus \
     # Chrome dependencies
     libnss3 libatk-bridge2.0-0 libdrm2 libxcomposite1 \
     libxdamage1 libxrandr2 libgbm1 libasound2 libpangocairo-1.0-0 \

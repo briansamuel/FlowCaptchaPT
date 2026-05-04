@@ -138,7 +138,11 @@
             <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
                 <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
-                API Docs</a>
+                Captcha Docs</a>
+            <a href="flow-docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Flow API</a>
         </nav>
     </aside>
 
@@ -842,38 +846,6 @@ curl -X POST http://your-server:8899/api/captcha \
             FlowCaptchaPT v1.0.0 &mdash; reCAPTCHA Enterprise Token Service
         </footer>
     </main>
-</body>
-
-</html>
-r => r.json());
-<span class="kw">if</span> ([<span class="str">"completed"</span>, <span class="str">"failed"</span>, <span class="str">"timeout"</span>].includes(job.status)) <span class="kw">return</span> job.token;
-<span class="kw">await</span> <span class="kw">new</span> Promise(r => setTimeout(r, <span class="num">3000</span>));
-}
-}
-<span class="kw">throw new</span> Error(data.error || <span class="str">"Failed"</span>);
-}</pre>
-</div>
-
-<h4 class="text-sm font-semibold text-dark-200 mb-2">cURL</h4>
-<div class="code-block">
-    <pre><span class="cm"># Get video token</span>
-curl -X POST http://your-server:8899/api/captcha \
-  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
-  -H "<span class="str">Content-Type: application/json</span>" \
-  -d '<span class="str">{"action": "VIDEO_GENERATION"}</span>'
-
-<span class="cm"># Get image token</span>
-curl -X POST http://your-server:8899/api/captcha \
-  -H "<span class="str">X-Api-Key: fc_your_key</span>" \
-  -H "<span class="str">Content-Type: application/json</span>" \
-  -d '<span class="str">{"action": "IMAGE_GENERATION"}</span>'</pre>
-</div>
-</section>
-
-<footer class="border-t border-dark-700 pt-6 pb-12 text-center text-dark-400 text-xs">
-    FlowCaptchaPT v1.0.0 &mdash; reCAPTCHA Enterprise Token Service
-</footer>
-</main>
 </body>
 
 </html>

@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flow API Documentation</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace']
+                    },
+                    colors: {
+                        dark: {
+                            50: '#f8fafc',
+                            100: '#e2e8f0',
+                            200: '#cbd5e1',
+                            300: '#94a3b8',
+                            400: '#64748b',
+                            500: '#475569',
+                            600: '#334155',
+                            700: '#1e293b',
+                            800: '#0f172a',
+                            900: '#020617'
+                        },
+                        accent: {
+                            DEFAULT: '#6366f1',
+                            light: '#818cf8',
+                            dark: '#4f46e5'
+                        },
+                        success: '#22c55e',
+                        danger: '#ef4444',
+                        warning: '#f59e0b',
+                        info: '#3b82f6',
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .code-block {
+            background: #0d1117;
+            border: 1px solid #21262d;
+            border-radius: 8px;
+            overflow-x: auto;
+        }
+
+        .code-block pre {
+            padding: 16px;
+            margin: 0;
+            font-size: 13px;
+            line-height: 1.6;
+            color: #c9d1d9;
+        }
+
+        .code-block .kw {
+            color: #ff7b72;
+        }
+
+        .code-block .str {
+            color: #a5d6ff;
+        }
+
+        .code-block .cm {
+            color: #8b949e;
+        }
+
+        .code-block .num {
+            color: #79c0ff;
+        }
+
+        .method-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        .method-post {
+            background: #22c55e20;
+            color: #22c55e;
+        }
+
+        .method-get {
+            background: #3b82f620;
+            color: #3b82f6;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        .sidebar-section {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            color: #64748b;
+            padding: 8px 12px 4px;
+        }
+
+        .sidebar-link {
+            display: block;
+            padding: 6px 12px;
+            font-size: 13px;
+            color: #94a3b8;
+            border-radius: 6px;
+            transition: all 0.15s;
+            text-decoration: none;
+        }
+
+        .sidebar-link:hover {
+            color: #fff;
+            background: #1e293b;
+        }
+
+        .sidebar-link.active {
+            color: #818cf8;
+            background: rgba(99, 102, 241, 0.1);
+        }
+
+        .param-required {
+            color: #ef4444;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .param-optional {
+            color: #64748b;
+            font-size: 10px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .mode-pill {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        @media (max-width: 768px) {
+            .doc-sidebar {
+                display: none;
+            }
+            .doc-main {
+                margin-left: 0 !important;
+            }
+        }
+    </style>
+</head>
+
+<body class="bg-dark-900 text-dark-100 font-sans min-h-screen">
+    <!-- Sidebar -->
+    <aside class="doc-sidebar fixed top-0 left-0 h-full w-60 bg-dark-800 border-r border-dark-600 z-40 flex flex-col overflow-y-auto">
+        <div class="p-5 border-b border-dark-600">
+            <h1 class="text-lg font-bold text-white tracking-tight">Flow API</h1>
+            <p class="text-xs text-dark-300 mt-1">Image &amp; Video Generation</p>
+        </div>
+        <nav class="flex-1 p-3 space-y-0.5">
+            <a href="index.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-4 0a1 1 0 01-1-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 01-1 1" /></svg>
+                Dashboard</a>
+            <a href="docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-dark-300 hover:text-white hover:bg-dark-700 transition-colors duration-200 cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                Captcha Docs</a>
+            <a href="flow-docs.html" class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium bg-accent/10 text-accent-light cursor-pointer">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Flow API Docs</a>
+
+            <div class="sidebar-section mt-4">Overview</div>
+            <a href="#introduction" class="sidebar-link active">Introduction</a>
+            <a href="#base-url" class="sidebar-link">Base URL</a>
+            <a href="#authentication" class="sidebar-link">Authentication</a>
+            <a href="#errors" class="sidebar-link">Error Handling</a>
+
+            <div class="sidebar-section mt-4">Images</div>
+            <a href="#images-generate" class="sidebar-link">Generate Image</a>
+            <a href="#images-upscale" class="sidebar-link">Upscale Image</a>
+
+            <div class="sidebar-section mt-4">Videos</div>
+            <a href="#videos-generate" class="sidebar-link">Generate Video</a>
+            <a href="#videos-upscale" class="sidebar-link">Upscale Video</a>
+            <a href="#videos-status" class="sidebar-link">Poll Status</a>
+
+            <div class="sidebar-section mt-4">Reference</div>
+            <a href="#model-keys" class="sidebar-link">Video Model Keys</a>
+            <a href="#try-it" class="sidebar-link">Try It (curl)</a>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="doc-main ml-60 p-8 max-w-4xl">
+        <!-- Header -->
+        <div class="mb-10">
+            <h2 class="text-3xl font-bold text-white">Flow API Documentation</h2>
+            <p class="text-dark-300 mt-2">Google Flow Image &amp; Video Generation Proxy API</p>
+        </div>
+
+        <!-- ============ INTRODUCTION ============ -->
+        <section id="introduction" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Introduction</h3>
+            <p class="text-dark-200 text-sm mb-4">The Flow API provides a unified interface for Google Flow's image and video generation capabilities. It supports text-to-image (T2I), image-to-image (I2I), text-to-video (T2V), image-to-video (I2V), first/last frame video (I2V-FL), reference-to-video (R2V), and upscaling for both images and videos.</p>
+            <p class="text-dark-200 text-sm">All endpoints accept and return JSON. All endpoints use the <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded text-accent-light">POST</code> method.</p>
+        </section>
+
+        <!-- ============ BASE URL ============ -->
+        <section id="base-url" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Base URL</h3>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <div class="code-block">
+                    <pre>http://localhost:9339</pre>
+                </div>
+                <p class="text-dark-400 text-xs mt-3">The port is configurable. All endpoint paths below are relative to this base URL. The API prefix is <code class="font-mono text-accent-light">/api/flow</code>.</p>
+            </div>
+        </section>
+
+        <!-- ============ AUTHENTICATION ============ -->
+        <section id="authentication" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Authentication</h3>
+            <p class="text-dark-200 text-sm mb-4">Each request must include a valid Google OAuth <code class="font-mono text-accent-light">accessToken</code> and <code class="font-mono text-accent-light">projectId</code> in the request body. These are used to authenticate with Google Flow's backend services.</p>
+
+            <div class="bg-dark-800 border border-dark-600 rounded-xl p-5">
+                <h4 class="text-sm font-semibold text-accent-light mb-2">Required Fields (every request)</h4>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="border-b border-dark-600">
+                                <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                                <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                                <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="border-b border-dark-700">
+                                <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                                <td class="px-5 py-2.5 text-dark-300">string</td>
+                                <td class="px-5 py-2.5 text-dark-200">Google OAuth access token</td>
+                            </tr>
+                            <tr>
+                                <td class="px-5 py-2.5 font-mono text-accent-light">projectId</td>
+                                <td class="px-5 py-2.5 text-dark-300">string</td>
+                                <td class="px-5 py-2.5 text-dark-200">Google Cloud project ID</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- ============ ERROR HANDLING ============ -->
+        <section id="errors" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Error Handling</h3>
+            <p class="text-dark-200 text-sm mb-4">When a request fails, the response will include <code class="font-mono text-accent-light">success: false</code> and an <code class="font-mono text-accent-light">error</code> field with a descriptive message.</p>
+            <div class="code-block">
+                <pre><span class="cm">// Error response format</span>
+{
+  "<span class="str">success</span>": <span class="kw">false</span>,
+  "<span class="str">error</span>": "<span class="str">Invalid access token or token expired</span>"
+}</pre>
+            </div>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mt-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">HTTP Code</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-success">200</td>
+                            <td class="px-5 py-2.5 text-dark-200">Success (check <code class="font-mono text-xs">success</code> field)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-warning">400</td>
+                            <td class="px-5 py-2.5 text-dark-200">Bad request / missing required fields</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-warning">401</td>
+                            <td class="px-5 py-2.5 text-dark-200">Invalid or expired access token</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-danger">500</td>
+                            <td class="px-5 py-2.5 text-dark-200">Internal server error / upstream failure</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ============ IMAGES / GENERATE ============ -->
+        <section id="images-generate" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/flow/images/generate</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Generate an image from a text prompt (T2I) or transform an existing image (I2I). For I2I, include a reference image as base64.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google OAuth access token</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">projectId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google project ID</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">promptText</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Text prompt describing the desired image</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">aspectRatio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">IMAGE_ASPECT_RATIO_SQUARE</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">imageModel</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">GEM_PIX_2</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">seed</td>
+                            <td class="px-5 py-2.5 text-dark-300">int</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Random seed for reproducibility</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">referenceImageBase64</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Base64-encoded reference image for I2I mode</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">referenceImageMimeType</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">image/jpeg</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">referenceImageFileName</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Filename for the reference image</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Aspect Ratio Values</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGE_ASPECT_RATIO_SQUARE</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGE_ASPECT_RATIO_LANDSCAPE</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGE_ASPECT_RATIO_PORTRAIT</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGE_ASPECT_RATIO_LANDSCAPE_FOUR_THREE</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGE_ASPECT_RATIO_PORTRAIT_THREE_FOUR</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Image Model Values</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">GEM_PIX_2</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">NARWHAL</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">IMAGEN_3_5</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <div class="code-block">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">batchId</span>": "<span class="str">a1b2c3d4-e5f6-7890-abcd-ef1234567890</span>",
+  "<span class="str">media</span>": [
+    {
+      "<span class="str">mediaName</span>": "<span class="str">f1e2d3c4-b5a6-7890-abcd-ef1234567890</span>",
+      "<span class="str">mediaId</span>": "<span class="str">f1e2d3c4-b5a6-7890-abcd-ef1234567890</span>",
+      "<span class="str">fifeUrl</span>": "<span class="str">https://flow-content.google/image/...</span>",
+      "<span class="str">seed</span>": <span class="num">12345</span>,
+      "<span class="str">prompt</span>": "<span class="str">A beautiful mountain landscape at sunset</span>",
+      "<span class="str">aspectRatio</span>": "<span class="str">IMAGE_ASPECT_RATIO_SQUARE</span>",
+      "<span class="str">dimensions</span>": { "<span class="str">width</span>": <span class="num">1024</span>, "<span class="str">height</span>": <span class="num">1024</span> }
+    }
+  ],
+  "<span class="str">remainingCredits</span>": <span class="num">95</span>
+}</pre>
+            </div>
+        </section>
+
+        <!-- ============ IMAGES / UPSCALE ============ -->
+        <section id="images-upscale" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/flow/images/upscale</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Upscale a previously generated image to 2K or 4K resolution. Use the <code class="font-mono text-accent-light">mediaName</code> from the generate response as the <code class="font-mono text-accent-light">mediaId</code>.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google OAuth access token</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">projectId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google project ID</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">mediaId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; The <code class="font-mono text-xs">mediaName</code> from the generate response</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">targetResolution</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">UPSAMPLE_IMAGE_RESOLUTION_4K</code></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Target Resolution Values</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">UPSAMPLE_IMAGE_RESOLUTION_2K</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">UPSAMPLE_IMAGE_RESOLUTION_4K</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <div class="code-block">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">encodedImage</span>": "<span class="str">/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAg...</span>"
+}</pre>
+            </div>
+            <div class="bg-dark-800 border border-info/30 rounded-xl p-4 mt-4">
+                <p class="text-sm text-info">The <code class="font-mono">encodedImage</code> field contains the full base64-encoded upscaled image. Decode it to get the image binary.</p>
+            </div>
+        </section>
+
+        <!-- ============ VIDEOS / GENERATE ============ -->
+        <section id="videos-generate" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/flow/videos/generate</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Generate a video. Supports four modes depending on which image fields are provided:</p>
+
+            <div class="grid grid-cols-2 gap-3 mb-6">
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="mode-pill bg-accent/20 text-accent-light">T2V</span>
+                        <span class="text-sm font-semibold text-white">Text-to-Video</span>
+                    </div>
+                    <p class="text-dark-400 text-xs">Only <code class="font-mono">promptText</code>, no images</p>
+                </div>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="mode-pill bg-success/20 text-success">I2V</span>
+                        <span class="text-sm font-semibold text-white">Image-to-Video</span>
+                    </div>
+                    <p class="text-dark-400 text-xs"><code class="font-mono">promptText</code> + <code class="font-mono">startImageBase64</code></p>
+                </div>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="mode-pill bg-warning/20 text-warning">I2V-FL</span>
+                        <span class="text-sm font-semibold text-white">First/Last Frame</span>
+                    </div>
+                    <p class="text-dark-400 text-xs"><code class="font-mono">promptText</code> + <code class="font-mono">startImageBase64</code> + <code class="font-mono">endImageBase64</code></p>
+                </div>
+                <div class="bg-dark-800 border border-dark-600 rounded-xl p-4">
+                    <div class="flex items-center gap-2 mb-2">
+                        <span class="mode-pill bg-info/20 text-info">R2V</span>
+                        <span class="text-sm font-semibold text-white">Reference-to-Video</span>
+                    </div>
+                    <p class="text-dark-400 text-xs"><code class="font-mono">promptText</code> + <code class="font-mono">referenceImages[]</code> (1-3 images)</p>
+                </div>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google OAuth access token</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">projectId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google project ID</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">promptText</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Text prompt describing the desired video</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">aspectRatio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">VIDEO_ASPECT_RATIO_LANDSCAPE</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">videoModelKey</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">veo_3_1_t2v_fast_4s</code> &mdash; See <a href="#model-keys" class="text-accent-light hover:text-white">Model Keys</a></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">seed</td>
+                            <td class="px-5 py-2.5 text-dark-300">int</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Random seed for reproducibility</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td colspan="3" class="px-5 py-3 text-dark-400 text-xs font-semibold uppercase tracking-wider bg-dark-700/30">I2V / I2V-FL Fields</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">startImageBase64</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Base64-encoded start frame image (I2V / I2V-FL)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">startImageMimeType</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">image/jpeg</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">startImageAspectRatio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">IMAGE_ASPECT_RATIO_LANDSCAPE</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">endImageBase64</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Base64-encoded end frame image (I2V-FL only)</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">endImageMimeType</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">image/jpeg</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">endImageAspectRatio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">IMAGE_ASPECT_RATIO_LANDSCAPE</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td colspan="3" class="px-5 py-3 text-dark-400 text-xs font-semibold uppercase tracking-wider bg-dark-700/30">R2V Fields</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">referenceImages</td>
+                            <td class="px-5 py-2.5 text-dark-300">array</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; 1-3 reference images for R2V mode. Each object: <code class="font-mono text-xs">{ base64, mimeType, aspectRatio }</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">referenceAudio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">zephyr</code> &mdash; Audio track for R2V</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Video Aspect Ratio Values</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">VIDEO_ASPECT_RATIO_LANDSCAPE</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">VIDEO_ASPECT_RATIO_PORTRAIT</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">VIDEO_ASPECT_RATIO_SQUARE</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <div class="code-block">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">batchId</span>": "<span class="str">a1b2c3d4-e5f6-7890-abcd-ef1234567890</span>",
+  "<span class="str">operations</span>": [
+    {
+      "<span class="str">operationName</span>": "<span class="str">op-uuid-1234</span>",
+      "<span class="str">sceneId</span>": "<span class="str">scene-uuid-5678</span>"
+    }
+  ],
+  "<span class="str">remainingCredits</span>": <span class="num">95</span>
+}</pre>
+            </div>
+            <div class="bg-dark-800 border border-info/30 rounded-xl p-4 mt-4">
+                <p class="text-sm text-info">Video generation is asynchronous. Use the <code class="font-mono">operationName</code> and <code class="font-mono">sceneId</code> from the response to poll for completion via <a href="#videos-status" class="text-accent-light hover:text-white underline">POST /api/flow/videos/status</a>.</p>
+            </div>
+        </section>
+
+        <!-- ============ VIDEOS / UPSCALE ============ -->
+        <section id="videos-upscale" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/flow/videos/upscale</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Upscale a previously generated video to 1080p or 4K resolution. Use the <code class="font-mono text-accent-light">operationName</code> from the generate response as the <code class="font-mono text-accent-light">videoMediaId</code>.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google OAuth access token</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">projectId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google project ID</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">videoMediaId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; The <code class="font-mono text-xs">operationName</code> from the generate response</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">resolution</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">VIDEO_RESOLUTION_1080P</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">aspectRatio</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">VIDEO_ASPECT_RATIO_LANDSCAPE</code></td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">videoModelKey</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Default: <code class="font-mono text-xs bg-dark-700 px-1.5 py-0.5 rounded">veo_3_1_upsampler_1080p</code></td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">seed</td>
+                            <td class="px-5 py-2.5 text-dark-300">int</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Random seed for reproducibility</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Resolution Values</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">VIDEO_RESOLUTION_1080P</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">VIDEO_RESOLUTION_4K</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Upscaler Model Keys</h4>
+            <div class="flex flex-wrap gap-2 mb-4">
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">veo_3_1_upsampler_1080p</code>
+                <code class="font-mono text-xs bg-dark-700 px-2 py-1 rounded text-dark-200">veo_3_1_upsampler_4k</code>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response</h4>
+            <p class="text-dark-300 text-sm mb-2">Same structure as <a href="#videos-generate" class="text-accent-light hover:text-white">videos/generate</a>:</p>
+            <div class="code-block">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">batchId</span>": "<span class="str">a1b2c3d4-e5f6-7890-abcd-ef1234567890</span>",
+  "<span class="str">operations</span>": [
+    {
+      "<span class="str">operationName</span>": "<span class="str">op-uuid-1234</span>",
+      "<span class="str">sceneId</span>": "<span class="str">scene-uuid-5678</span>"
+    }
+  ],
+  "<span class="str">remainingCredits</span>": <span class="num">95</span>
+}</pre>
+            </div>
+            <div class="bg-dark-800 border border-info/30 rounded-xl p-4 mt-4">
+                <p class="text-sm text-info">Upscaling is also asynchronous. Poll <a href="#videos-status" class="text-accent-light hover:text-white underline">POST /api/flow/videos/status</a> with the returned <code class="font-mono">operationName</code> to get the upscaled video URL.</p>
+            </div>
+        </section>
+
+        <!-- ============ VIDEOS / STATUS ============ -->
+        <section id="videos-status" class="mb-12">
+            <div class="flex items-center gap-3 mb-4">
+                <span class="method-badge method-post">POST</span>
+                <code class="text-white font-mono text-lg">/api/flow/videos/status</code>
+            </div>
+            <p class="text-dark-200 text-sm mb-4">Poll the status of one or more video generation or upscale operations. Call this endpoint repeatedly until <code class="font-mono text-accent-light">completed</code> is <code class="font-mono text-accent-light">true</code>.</p>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Request Body</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">accessToken</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Google OAuth access token</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">operations</td>
+                            <td class="px-5 py-2.5 text-dark-300">array</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Array of operation objects to poll</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Operations Array Item</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Field</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Type</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-accent-light">operationName</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-required">required</span> &mdash; Operation ID from generate/upscale response</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-accent-light">sceneId</td>
+                            <td class="px-5 py-2.5 text-dark-300">string</td>
+                            <td class="px-5 py-2.5 text-dark-200"><span class="param-optional">optional</span> &mdash; Scene ID from generate response (default: empty string)</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response (Successful)</h4>
+            <div class="code-block mb-4">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">completed</span>": <span class="kw">true</span>,
+  "<span class="str">operations</span>": [
+    {
+      "<span class="str">status</span>": "<span class="str">MEDIA_GENERATION_STATUS_SUCCESSFUL</span>",
+      "<span class="str">operationName</span>": "<span class="str">op-uuid-1234</span>",
+      "<span class="str">sceneId</span>": "<span class="str">scene-uuid-5678</span>",
+      "<span class="str">video</span>": {
+        "<span class="str">fifeUrl</span>": "<span class="str">https://flow-content.google/video/...</span>",
+        "<span class="str">servingBaseUri</span>": "<span class="str">...</span>",
+        "<span class="str">mediaId</span>": "<span class="str">media-uuid-9012</span>",
+        "<span class="str">seed</span>": <span class="num">12345</span>,
+        "<span class="str">prompt</span>": "<span class="str">A cinematic drone shot over mountains</span>",
+        "<span class="str">model</span>": "<span class="str">veo_3_1_t2v_fast_4s</span>",
+        "<span class="str">aspectRatio</span>": "<span class="str">VIDEO_ASPECT_RATIO_LANDSCAPE</span>"
+      }
+    }
+  ],
+  "<span class="str">remainingCredits</span>": <span class="num">95</span>
+}</pre>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Response (Still Processing)</h4>
+            <div class="code-block mb-4">
+                <pre>{
+  "<span class="str">success</span>": <span class="kw">true</span>,
+  "<span class="str">completed</span>": <span class="kw">false</span>,
+  "<span class="str">operations</span>": [
+    {
+      "<span class="str">status</span>": "<span class="str">MEDIA_GENERATION_STATUS_ACTIVE</span>",
+      "<span class="str">operationName</span>": "<span class="str">op-uuid-1234</span>",
+      "<span class="str">sceneId</span>": "<span class="str">scene-uuid-5678</span>",
+      "<span class="str">video</span>": <span class="kw">null</span>
+    }
+  ],
+  "<span class="str">remainingCredits</span>": <span class="num">95</span>
+}</pre>
+            </div>
+
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">Status Values</h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Status</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Meaning</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-dark-300 text-xs">MEDIA_GENERATION_STATUS_PENDING</td>
+                            <td class="px-5 py-2.5 text-dark-200">Queued, not yet started</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-warning text-xs">MEDIA_GENERATION_STATUS_ACTIVE</td>
+                            <td class="px-5 py-2.5 text-dark-200">Currently generating</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 font-mono text-success text-xs">MEDIA_GENERATION_STATUS_SUCCESSFUL</td>
+                            <td class="px-5 py-2.5 text-dark-200">Complete &mdash; video URL available</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 font-mono text-danger text-xs">MEDIA_GENERATION_STATUS_FAILED</td>
+                            <td class="px-5 py-2.5 text-dark-200">Generation failed</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <div class="bg-dark-800 border border-warning/30 rounded-xl p-4 mt-4">
+                <p class="text-sm text-warning">Recommended polling interval: every 5-10 seconds. Video generation typically takes 30-120 seconds depending on model and duration.</p>
+            </div>
+        </section>
+
+        <!-- ============ MODEL KEYS REFERENCE ============ -->
+        <section id="model-keys" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Video Model Keys Reference</h3>
+            <p class="text-dark-200 text-sm mb-4">Use these model key values in the <code class="font-mono text-accent-light">videoModelKey</code> field. Choose based on mode, speed tier, and desired duration/orientation.</p>
+
+            <!-- T2V -->
+            <h4 class="text-sm font-semibold text-white mb-2 mt-6 flex items-center gap-2">
+                <span class="mode-pill bg-accent/20 text-accent-light">T2V</span> Text-to-Video
+            </h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Tier</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Model Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 4s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v_fast_4s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v_fast_6s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Default 8s (16:9)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Default 8s (9:16)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v_portrait</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v_lite_6s</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 8s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_t2v_lite</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- I2V -->
+            <h4 class="text-sm font-semibold text-white mb-2 mt-6 flex items-center gap-2">
+                <span class="mode-pill bg-success/20 text-success">I2V</span> Image-to-Video
+            </h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Tier</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Model Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 4s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_4s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_6s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 8s (16:9)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_ultra</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 8s (9:16)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_portrait_ultra</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Quality 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_quality_6s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_lite_6s</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 8s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_lite</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- I2V-FL -->
+            <h4 class="text-sm font-semibold text-white mb-2 mt-6 flex items-center gap-2">
+                <span class="mode-pill bg-warning/20 text-warning">I2V-FL</span> First/Last Frame
+            </h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Tier</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Model Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast (16:9)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_ultra_fl</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 text-dark-200">Fast (9:16)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_i2v_s_fast_portrait_ultra_fl</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- R2V -->
+            <h4 class="text-sm font-semibold text-white mb-2 mt-6 flex items-center gap-2">
+                <span class="mode-pill bg-info/20 text-info">R2V</span> Reference-to-Video
+            </h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden mb-4">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Tier</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Model Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 4s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_fast_4s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_fast_6s</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 8s (16:9)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_fast_landscape_ultra</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Fast 8s (9:16)</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_fast_portrait_ultra</td>
+                        </tr>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 6s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_lite_6s</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 text-dark-200">Relaxed 8s</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_r2v_lite</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Upscale -->
+            <h4 class="text-sm font-semibold text-white mb-2 mt-6 flex items-center gap-2">
+                <span class="mode-pill bg-dark-400/20 text-dark-200">Upscale</span> Video Upscaling
+            </h4>
+            <div class="bg-dark-800 border border-dark-600 rounded-xl overflow-hidden">
+                <table class="w-full text-sm">
+                    <thead>
+                        <tr class="border-b border-dark-600">
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Tier</th>
+                            <th class="text-left px-5 py-3 text-dark-300 font-medium">Model Key</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr class="border-b border-dark-700">
+                            <td class="px-5 py-2.5 text-dark-200">1080p</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_upsampler_1080p</td>
+                        </tr>
+                        <tr>
+                            <td class="px-5 py-2.5 text-dark-200">4K</td>
+                            <td class="px-5 py-2.5 font-mono text-accent-light text-xs">veo_3_1_upsampler_4k</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+
+        <!-- ============ TRY IT (CURL EXAMPLES) ============ -->
+        <section id="try-it" class="mb-12">
+            <h3 class="text-xl font-bold text-white mb-4">Try It (curl Examples)</h3>
+            <p class="text-dark-200 text-sm mb-6">Copy and paste these examples to test the API. Replace <code class="font-mono text-accent-light">YOUR_ACCESS_TOKEN</code> and <code class="font-mono text-accent-light">YOUR_PROJECT_ID</code> with your actual credentials.</p>
+
+            <!-- Generate Image -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">1. Generate an Image (T2I)</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Text-to-Image generation</span>
+curl -X POST http://localhost:9339/api/flow/images/generate \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">projectId</span>": "<span class="str">YOUR_PROJECT_ID</span>",
+    "<span class="str">promptText</span>": "<span class="str">A serene Japanese garden with cherry blossoms</span>",
+    "<span class="str">aspectRatio</span>": "<span class="str">IMAGE_ASPECT_RATIO_LANDSCAPE</span>",
+    "<span class="str">imageModel</span>": "<span class="str">GEM_PIX_2</span>"
+  }'</pre>
+            </div>
+
+            <!-- Upscale Image -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">2. Upscale an Image to 4K</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Upscale using mediaName from generate response</span>
+curl -X POST http://localhost:9339/api/flow/images/upscale \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">projectId</span>": "<span class="str">YOUR_PROJECT_ID</span>",
+    "<span class="str">mediaId</span>": "<span class="str">MEDIA_NAME_FROM_GENERATE</span>",
+    "<span class="str">targetResolution</span>": "<span class="str">UPSAMPLE_IMAGE_RESOLUTION_4K</span>"
+  }'</pre>
+            </div>
+
+            <!-- Generate Video (T2V) -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">3. Generate a Video (T2V)</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Text-to-Video generation</span>
+curl -X POST http://localhost:9339/api/flow/videos/generate \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">projectId</span>": "<span class="str">YOUR_PROJECT_ID</span>",
+    "<span class="str">promptText</span>": "<span class="str">A cinematic drone shot flying over misty mountains at sunrise</span>",
+    "<span class="str">aspectRatio</span>": "<span class="str">VIDEO_ASPECT_RATIO_LANDSCAPE</span>",
+    "<span class="str">videoModelKey</span>": "<span class="str">veo_3_1_t2v_fast_4s</span>"
+  }'</pre>
+            </div>
+
+            <!-- Generate Video (I2V) -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">4. Generate a Video from Image (I2V)</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Image-to-Video: provide a start frame</span>
+curl -X POST http://localhost:9339/api/flow/videos/generate \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">projectId</span>": "<span class="str">YOUR_PROJECT_ID</span>",
+    "<span class="str">promptText</span>": "<span class="str">The camera slowly zooms in as petals fall</span>",
+    "<span class="str">videoModelKey</span>": "<span class="str">veo_3_1_i2v_s_fast_6s</span>",
+    "<span class="str">startImageBase64</span>": "<span class="str">BASE64_ENCODED_IMAGE_DATA</span>",
+    "<span class="str">startImageMimeType</span>": "<span class="str">image/jpeg</span>"
+  }'</pre>
+            </div>
+
+            <!-- Upscale Video -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">5. Upscale a Video to 4K</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Upscale using operationName from generate response</span>
+curl -X POST http://localhost:9339/api/flow/videos/upscale \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">projectId</span>": "<span class="str">YOUR_PROJECT_ID</span>",
+    "<span class="str">videoMediaId</span>": "<span class="str">OPERATION_NAME_FROM_GENERATE</span>",
+    "<span class="str">resolution</span>": "<span class="str">VIDEO_RESOLUTION_4K</span>",
+    "<span class="str">videoModelKey</span>": "<span class="str">veo_3_1_upsampler_4k</span>"
+  }'</pre>
+            </div>
+
+            <!-- Poll Status -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">6. Poll Video Status</h4>
+            <div class="code-block mb-6">
+                <pre><span class="cm"># Poll until completed is true</span>
+curl -X POST http://localhost:9339/api/flow/videos/status \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d '{
+    "<span class="str">accessToken</span>": "<span class="str">YOUR_ACCESS_TOKEN</span>",
+    "<span class="str">operations</span>": [
+      {
+        "<span class="str">operationName</span>": "<span class="str">OPERATION_NAME_FROM_GENERATE</span>",
+        "<span class="str">sceneId</span>": "<span class="str">SCENE_ID_FROM_GENERATE</span>"
+      }
+    ]
+  }'</pre>
+            </div>
+
+            <!-- Full Workflow -->
+            <h4 class="text-sm font-semibold text-dark-200 mb-2">7. Full Workflow (Generate + Poll)</h4>
+            <div class="code-block">
+                <pre><span class="cm">#!/bin/bash</span>
+<span class="cm"># Full workflow: generate video, then poll until done</span>
+
+<span class="kw">TOKEN</span>=<span class="str">"YOUR_ACCESS_TOKEN"</span>
+<span class="kw">PROJECT</span>=<span class="str">"YOUR_PROJECT_ID"</span>
+<span class="kw">BASE</span>=<span class="str">"http://localhost:9339"</span>
+
+<span class="cm"># Step 1: Generate</span>
+<span class="kw">RESULT</span>=$(curl -s -X POST $BASE/api/flow/videos/generate \
+  -H "<span class="str">Content-Type: application/json</span>" \
+  -d "{
+    \"<span class="str">accessToken</span>\": \"<span class="str">$TOKEN</span>\",
+    \"<span class="str">projectId</span>\": \"<span class="str">$PROJECT</span>\",
+    \"<span class="str">promptText</span>\": \"<span class="str">A cat playing piano</span>\",
+    \"<span class="str">videoModelKey</span>\": \"<span class="str">veo_3_1_t2v_fast_4s</span>\"
+  }")
+
+echo "<span class="str">Generate response:</span> $RESULT"
+
+<span class="cm"># Extract operationName and sceneId (requires jq)</span>
+<span class="kw">OP_NAME</span>=$(echo $RESULT | jq -r '.operations[0].operationName')
+<span class="kw">SCENE_ID</span>=$(echo $RESULT | jq -r '.operations[0].sceneId')
+
+<span class="cm"># Step 2: Poll until done</span>
+<span class="kw">while true</span>; <span class="kw">do</span>
+  sleep <span class="num">10</span>
+  <span class="kw">STATUS</span>=$(curl -s -X POST $BASE/api/flow/videos/status \
+    -H "<span class="str">Content-Type: application/json</span>" \
+    -d "{
+      \"<span class="str">accessToken</span>\": \"<span class="str">$TOKEN</span>\",
+      \"<span class="str">operations</span>\": [{
+        \"<span class="str">operationName</span>\": \"<span class="str">$OP_NAME</span>\",
+        \"<span class="str">sceneId</span>\": \"<span class="str">$SCENE_ID</span>\"
+      }]
+    }")
+
+  <span class="kw">COMPLETED</span>=$(echo $STATUS | jq -r '.completed')
+  echo "<span class="str">Polling... completed=$COMPLETED</span>"
+
+  <span class="kw">if</span> [ "$COMPLETED" = "<span class="str">true</span>" ]; <span class="kw">then</span>
+    echo "<span class="str">Done!</span>"
+    echo $STATUS | jq '.operations[0].video.fifeUrl'
+    <span class="kw">break</span>
+  <span class="kw">fi</span>
+<span class="kw">done</span></pre>
+            </div>
+        </section>
+
+        <footer class="border-t border-dark-700 pt-6 pb-12 text-center text-dark-400 text-xs">
+            Flow API Documentation &mdash; Image &amp; Video Generation via Google Flow
+        </footer>
+    </main>
+
+    <!-- Sidebar active link tracking -->
+    <script>
+        (function() {
+            const sidebarLinks = document.querySelectorAll('.sidebar-link');
+            const sections = [];
+
+            sidebarLinks.forEach(link => {
+                const href = link.getAttribute('href');
+                if (href && href.startsWith('#')) {
+                    const section = document.getElementById(href.slice(1));
+                    if (section) {
+                        sections.push({ link, section });
+                    }
+                }
+            });
+
+            function updateActive() {
+                let current = sections[0];
+                const scrollY = window.scrollY + 120;
+
+                for (const item of sections) {
+                    if (item.section.offsetTop <= scrollY) {
+                        current = item;
+                    }
+                }
+
+                sidebarLinks.forEach(l => l.classList.remove('active'));
+                if (current) {
+                    current.link.classList.add('active');
+                }
+            }
+
+            window.addEventListener('scroll', updateActive, { passive: true });
+            updateActive();
+        })();
+    </script>
+</body>
+
+</html>

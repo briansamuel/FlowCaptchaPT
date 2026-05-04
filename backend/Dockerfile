@@ -30,8 +30,8 @@ COPY backend/app/ ./app/
 COPY backend/entrypoint.sh .
 RUN chmod +x entrypoint.sh
 
-# Frontend static files (optional - uncomment when frontend/ dir exists)
-# COPY frontend/ ./frontend/
+# Copy frontend static files
+COPY frontend/ ./frontend/
 
 RUN mkdir -p /app/data /app/chrome-profile
 

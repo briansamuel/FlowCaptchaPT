@@ -9,7 +9,7 @@ services:
       - "9339:9339"
     volumes:
       - ./backend/chrome-profile-docker:/app/chrome-profile
-      - ./backend/data-docker:/app/data
+      - ./backend/data:/app/data
     environment:
       - FC_ADMIN_TOKEN=flowcaptcha-admin-2024
       - FC_MAX_CONCURRENT=3
@@ -19,6 +19,7 @@ services:
       - FC_DEFAULT_WAIT_DELAY=3
       - FC_HOST=0.0.0.0
       - FC_PORT=9339
+      - DISPLAY=:99
     restart: unless-stopped
     # Chrome needs shared memory
     shm_size: "512m"

@@ -19,9 +19,6 @@ class Settings(BaseSettings):
     default_wait_delay: int = 3
     headless: bool = False
 
-    # Proxy (residential proxy for VPS)
-    proxy: str = ""  # e.g. socks5://user:pass@host:port or http://user:pass@host:port
-
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

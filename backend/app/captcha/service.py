@@ -33,10 +33,9 @@ class CaptchaResult:
 class CaptchaService:
     """Non-headless Chrome + raw CDP. Chrome stays alive, reuses warm tab."""
 
-    def __init__(self, profile_dir: str, headless: bool = False, proxy: str = ""):
+    def __init__(self, profile_dir: str, headless: bool = False):
         self.profile_dir = profile_dir
         self.headless = headless
-        self.proxy = proxy
         self._semaphore: Optional[asyncio.Semaphore] = None
         self._cooldown_until: float = 0
         self.cooldown: int = 10
@@ -71,21 +70,15 @@ class CaptchaService:
         profile = Path(self.profile_dir)
         for fname in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
             f = profile / fname
-            if f.exists():
+            try:
+                f.unlink(missing_ok=True)
+            except OSError:
+                # On Windows, SingletonLock is a symlink that Path.unlink()
+                # may fail with WinError 1920. Force-remove via os.remove.
                 try:
-                    f.unlink()
-                    logger.info(f"Removed stale lock: {fname}")
+                    os.remove(str(f))
                 except OSError:
-                    # Windows: file locked by another process, force kill Chrome
-                    logger.warning(f"Cannot remove {fname}, killing stale Chrome...")
-                    self._kill_stale_chrome()
-                    import time as _t
-                    _t.sleep(1)
-                    try:
-                        f.unlink()
-                        logger.info(f"Removed {fname} after killing Chrome")
-                    except Exception as e:
-                        logger.error(f"Still cannot remove {fname}: {e}")
+                    pass
 
     def _is_chrome_alive(self) -> bool:
         if not self._chrome_proc or self._chrome_proc.poll() is not None:
@@ -134,37 +127,35 @@ class CaptchaService:
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--password-store=basic",
+                "--disable-gpu",
+                "--disable-software-rasterizer",
                 "--disable-dev-shm-usage",
+                "--disable-extensions",
+                "--disable-plugins",
+                "--disable-images",
+                "--blink-settings=imagesEnabled=false",
                 "--disable-default-apps",
                 "--disable-sync",
                 "--disable-translate",
+                "--disable-features=TranslateUI,MediaRouter,OptimizationHints,VizDisplayCompositor",
                 "--disable-component-update",
                 "--disable-background-networking",
+                "--disable-background-timer-throttling",
+                "--disable-backgrounding-occluded-windows",
+                "--disable-renderer-backgrounding",
                 "--disable-ipc-flooding-protection",
                 "--disable-hang-monitor",
                 "--no-pings",
                 "--metrics-recording-only",
-                "--lang=en-US",
-                "--window-size=1920,1080",
+                "--disable-crash-reporter",
+                "--disable-breakpad",
+                "--window-size=800,600",
+                "--window-position=9999,9999",
+                "--start-minimized",
             ]
 
             if self.headless:
                 args.append("--headless=new")
-
-            if self.proxy:
-                from .proxy_ext import create_proxy_extension, parse_proxy_url
-                proxy_info = parse_proxy_url(self.proxy)
-                if proxy_info["username"]:
-                    # Use extension for authenticated proxy
-                    ext_dir = os.path.join(self.profile_dir, "proxy_ext")
-                    create_proxy_extension(self.proxy, ext_dir)
-                    # Remove --disable-extensions if present, add extension load
-                    args = [a for a in args if a != "--disable-extensions"]
-                    args.append(f"--load-extension={ext_dir}")
-                    logger.info(f"Using proxy extension: {proxy_info['host']}:{proxy_info['port']}")
-                else:
-                    args.append(f"--proxy-server={self.proxy}")
-                    logger.info(f"Using proxy: {self.proxy}")
 
             args.append(TARGET_URL)
 
@@ -442,7 +433,6 @@ def get_captcha_service() -> CaptchaService:
         _instance = CaptchaService(
             profile_dir=str(settings.chrome_profile_path),
             headless=settings.headless,
-            proxy=settings.proxy,
         )
         _instance.set_concurrency(settings.max_concurrent)
         _instance.cooldown = settings.default_cooldown

@@ -5,6 +5,7 @@ import { getAdminToken, setAdminToken, api } from '../lib/api'
 const links = [
   { to: '/', label: 'Dashboard' },
   { to: '/keys', label: 'API Keys' },
+  { to: '/cookies', label: 'Cookies' },
   { to: '/settings', label: 'Settings' },
   { to: '/logs', label: 'Logs' },
 ]

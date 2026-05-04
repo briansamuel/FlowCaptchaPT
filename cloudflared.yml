@@ -3,5 +3,5 @@ credentials-file: C:\Users\Brian\.cloudflared\8a5ed565-e838-45d6-a98f-68015d64d8
 
 ingress:
   - hostname: captcha.autosdvn.top
-    service: http://localhost:9339
+    service: http://localhost:8900
   - service: http_status:404

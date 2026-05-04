@@ -1,6 +1,7 @@
 """Flow API endpoints - Image/Video generation via Google Labs Flow."""
 from __future__ import annotations
 import asyncio
+import json
 import logging
 import time
 import uuid
@@ -145,6 +146,49 @@ def _headers(access_token: str) -> dict:
     }
 
 
+FLOW_MAX_RETRIES = 3
+FLOW_RETRY_DELAY = 10
+
+ERROR_MESSAGES_VI = {
+    "PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED": "Nội dung bị chặn: chứa hình ảnh người nổi tiếng",
+    "PUBLIC_ERROR_UNUSUAL_ACTIVITY": "Hoạt động bất thường, đang thử lại...",
+    "PUBLIC_ERROR_SAFETY_FILTER_TRIGGERED": "Nội dung bị chặn bởi bộ lọc an toàn",
+    "PUBLIC_ERROR_IMAGE_GENERATION_FAILED": "Tạo ảnh thất bại",
+    "PUBLIC_ERROR_VIDEO_GENERATION_FAILED": "Tạo video thất bại",
+    "PUBLIC_ERROR_NSFW_FILTER_TRIGGERED": "Nội dung bị chặn: vi phạm chính sách nội dung",
+    "PUBLIC_ERROR_RATE_LIMIT_EXCEEDED": "Vượt quá giới hạn tốc độ, vui lòng thử lại sau",
+    "PUBLIC_ERROR_QUOTA_EXCEEDED": "Hết credit, vui lòng nạp thêm",
+}
+
+
+def _parse_flow_error(text: str, status_code: int) -> tuple[str, str, bool]:
+    """Parse Flow API error. Returns (reason, vi_message, is_retryable)."""
+    reason = ""
+    try:
+        data = json.loads(text)
+        details = data.get("error", {}).get("details", [])
+        for d in details:
+            if d.get("reason"):
+                reason = d["reason"]
+                break
+    except (json.JSONDecodeError, KeyError):
+        pass
+
+    is_retryable = "unusual" in text.lower() or status_code == 503
+    vi_msg = ERROR_MESSAGES_VI.get(reason)
+    if not vi_msg:
+        if status_code == 401:
+            vi_msg = "Token xác thực hết hạn hoặc không hợp lệ"
+        elif status_code == 403:
+            vi_msg = "Không có quyền truy cập"
+        elif "upload" in text.lower() or "image" in text.lower():
+            vi_msg = "Lỗi xử lý ảnh"
+        else:
+            vi_msg = "Lỗi tạo nội dung"
+
+    return reason, vi_msg, is_retryable
+
+
 async def _flow_request(
     method: str,
     url: str,
@@ -152,19 +196,28 @@ async def _flow_request(
     body: dict = None,
     timeout_s: int = 120,
 ) -> dict:
-    async with aiohttp.ClientSession() as session:
-        async with session.request(
-            method,
-            url,
-            headers=_headers(access_token),
-            json=body,
-            timeout=aiohttp.ClientTimeout(total=timeout_s),
-        ) as resp:
-            if resp.status != 200:
+    for attempt in range(1, FLOW_MAX_RETRIES + 1):
+        async with aiohttp.ClientSession() as session:
+            async with session.request(
+                method,
+                url,
+                headers=_headers(access_token),
+                json=body,
+                timeout=aiohttp.ClientTimeout(total=timeout_s),
+            ) as resp:
+                if resp.status == 200:
+                    return await resp.json()
                 text = await resp.text()
-                logger.error(f"Flow API {resp.status}: {text[:500]}")
-                raise HTTPException(resp.status, f"Flow API error: {text[:500]}")
-            return await resp.json()
+                reason, vi_msg, is_retryable = _parse_flow_error(text, resp.status)
+                if is_retryable and attempt < FLOW_MAX_RETRIES:
+                    logger.warning(
+                        f"Flow API {resp.status} [{reason}] (lần {attempt}/{FLOW_MAX_RETRIES}): {vi_msg}. "
+                        f"Thử lại sau {FLOW_RETRY_DELAY}s..."
+                    )
+                    await asyncio.sleep(FLOW_RETRY_DELAY)
+                    continue
+                logger.error(f"Flow API {resp.status} [{reason}]: {vi_msg}")
+                raise HTTPException(resp.status, vi_msg)
 
 
 # ---------------------------------------------------------------------------

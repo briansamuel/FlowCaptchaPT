@@ -79,7 +79,7 @@ class RawCDPClient:
         if params:
             msg["params"] = params
 
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
         self._pending[msg_id] = future
 
         await self._ws.send_json(msg)
@@ -92,10 +92,10 @@ class RawCDPClient:
 
     async def wait_event(self, method: str, timeout: float = 60) -> dict:
         """Wait for a specific CDP event."""
-        deadline = asyncio.get_event_loop().time() + timeout
-        while asyncio.get_event_loop().time() < deadline:
+        deadline = asyncio.get_running_loop().time() + timeout
+        while asyncio.get_running_loop().time() < deadline:
             try:
-                remaining = deadline - asyncio.get_event_loop().time()
+                remaining = deadline - asyncio.get_running_loop().time()
                 event = await asyncio.wait_for(self._events.get(), timeout=max(0.1, remaining))
                 if event.get("method") == method:
                     return event
@@ -169,7 +169,7 @@ class PageSession:
         if params:
             msg["params"] = params
 
-        future = asyncio.get_event_loop().create_future()
+        future = asyncio.get_running_loop().create_future()
         self.client._pending[msg_id] = future
         await self.client._ws.send_json(msg)
 

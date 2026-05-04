@@ -130,23 +130,8 @@ async def open_login_browser():
     Close the browser window when done.
     """
     service = get_captcha_service()
-
-    loop = asyncio.get_running_loop()
-    result = await loop.run_in_executor(None, lambda: _sync_open_login(service))
+    result = await service.open_for_login()
     return {"message": result}
-
-
-def _sync_open_login(service):
-    import asyncio as _asyncio
-    if sys.platform == "win32":
-        loop = _asyncio.ProactorEventLoop()
-    else:
-        loop = _asyncio.new_event_loop()
-    _asyncio.set_event_loop(loop)
-    try:
-        return loop.run_until_complete(service.open_for_login())
-    finally:
-        loop.close()
 
 
 @router.post("/import-cookies")

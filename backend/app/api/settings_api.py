@@ -44,7 +44,7 @@ async def update_settings(req: UpdateSettings, _=Depends(require_admin)):
     if req.headless is not None:
         svc.headless = req.headless
     if req.max_concurrent is not None:
-        settings.max_concurrent = max(1, min(req.max_concurrent, 10))
+        settings.max_concurrent = max(1, min(req.max_concurrent, 64))
         svc.set_concurrency(settings.max_concurrent)
     if req.cooldown is not None:
         svc.cooldown = max(0, min(req.cooldown, 300))

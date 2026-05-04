@@ -1,6 +1,7 @@
 """
 Captcha Service - Real Chrome + Raw CDP token extraction.
-Optimized: Chrome stays alive, reuses tabs, minimal RAM, no window flash.
+Tab pool: multiple warm tabs for parallel token minting.
+Pure async — no per-request threads. Only ensure_chrome() runs in executor.
 """
 from __future__ import annotations
 import sys
@@ -17,6 +18,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
+MAX_TAB_POOL = 8
+
+# Only for blocking ensure_chrome() — 2 workers is enough
 _executor = ThreadPoolExecutor(max_workers=2)
 
 SITE_KEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV"
@@ -32,7 +36,7 @@ class CaptchaResult:
 
 
 class CaptchaService:
-    """Non-headless Chrome + raw CDP. Chrome stays alive, reuses warm tab."""
+    """Non-headless Chrome + raw CDP. Tab pool for parallel minting."""
 
     def __init__(self, profile_dir: str, headless: bool = False):
         self.profile_dir = profile_dir
@@ -44,13 +48,21 @@ class CaptchaService:
         self.wait_delay: int = 15
         self._chrome_proc: Optional[subprocess.Popen] = None
         self._cdp_port: Optional[int] = None
-        # Reusable warm tab — keeps grecaptcha loaded
-        self._warm_tab_id: Optional[str] = None
+        # Tab pool: slot_index -> tab_id
+        self._warm_tabs: dict = {}
+        self._tab_queue: Optional[asyncio.Queue] = None
+        self._pool_size: int = MAX_TAB_POOL
         # Lock to prevent multiple Chrome launches
         self._chrome_lock = __import__('threading').Lock()
 
     def set_concurrency(self, max_concurrent: int):
+        self._pool_size = min(max_concurrent, MAX_TAB_POOL)
         self._semaphore = asyncio.Semaphore(max_concurrent)
+        self._warm_tabs = {}
+        self._tab_queue = asyncio.Queue()
+        for i in range(self._pool_size):
+            self._tab_queue.put_nowait(i)
+        logger.info(f"Tab pool: {self._pool_size} slots, max_concurrent={max_concurrent}")
 
     @staticmethod
     def _find_system_chrome() -> Optional[str]:
@@ -74,8 +86,6 @@ class CaptchaService:
             try:
                 f.unlink(missing_ok=True)
             except OSError:
-                # On Windows, SingletonLock is a symlink that Path.unlink()
-                # may fail with WinError 1920. Force-remove via os.remove.
                 try:
                     os.remove(str(f))
                 except OSError:
@@ -108,7 +118,7 @@ class CaptchaService:
 
             self._cleanup_locks()
             self._kill_stale_chrome()
-            self._warm_tab_id = None
+            self._warm_tabs = {}
 
             port_file = Path(self.profile_dir) / "DevToolsActivePort"
             if port_file.exists():
@@ -174,11 +184,9 @@ class CaptchaService:
 
             self._chrome_proc = subprocess.Popen(args, **popen_kwargs)
 
-            # Wait for CDP port
             import socket
-            deadline = _time.time() + 30
+            deadline = _time.time() + 15
             while _time.time() < deadline:
-                # Check if Chrome crashed
                 if self._chrome_proc.poll() is not None:
                     exit_code = self._chrome_proc.returncode
                     stderr_out = ""
@@ -227,7 +235,6 @@ class CaptchaService:
                         except Exception:
                             pass
             else:
-                # Linux: use pkill/pgrep
                 result = sp.run(
                     ["pgrep", "-f", f"--user-data-dir=.*{profile_name}"],
                     capture_output=True, text=True, timeout=5
@@ -243,11 +250,19 @@ class CaptchaService:
         except Exception:
             pass
 
-    async def _setup_warm_tab(self, cdp):
+    async def _setup_warm_tab(self, cdp, slot: int = 0):
         """Create a new tab on labs.google and inject reCAPTCHA script."""
+        old_tab = self._warm_tabs.get(slot)
+        if old_tab:
+            try:
+                await cdp.close_tab(old_tab)
+                logger.debug(f"Closed zombie tab in slot {slot}: {old_tab[:12]}")
+            except Exception:
+                pass
+
         target_id = await cdp.create_tab(TARGET_URL)
         page = await cdp.attach_to_target(target_id)
-        self._warm_tab_id = target_id
+        self._warm_tabs[slot] = target_id
 
         for _ in range(30):
             try:
@@ -288,25 +303,30 @@ class CaptchaService:
         else:
             raise RuntimeError("grecaptcha not ready after 15s")
 
-        logger.info("New tab ready, grecaptcha injected")
+        logger.info(f"Tab slot {slot} ready, grecaptcha injected (tab={target_id[:12]})")
         return page
 
-    async def _extract_via_cdp(self, action: str, wait_delay: int = 0) -> CaptchaResult:
-        """Reuse warm tab if possible, otherwise create new one. Extract token."""
+    async def _extract_via_cdp(self, action: str, wait_delay: int = 0, slot: int = 0) -> CaptchaResult:
+        """Runs on main event loop. Each slot is independent."""
         from .cdp_client import RawCDPClient
 
         result = CaptchaResult(action=action)
         cdp = None
 
         try:
-            port = self.ensure_chrome()
+            loop = asyncio.get_running_loop()
+            port = await loop.run_in_executor(_executor, self.ensure_chrome)
+
             cdp = RawCDPClient(port)
             await cdp.connect()
 
+            # Try to reuse warm tab
             page = None
-            if self._warm_tab_id:
+            tab_reused = False
+            tab_id = self._warm_tabs.get(slot)
+            if tab_id:
                 try:
-                    page = await cdp.attach_to_target(self._warm_tab_id)
+                    page = await cdp.attach_to_target(tab_id)
                     url = await page.evaluate("window.location.href")
                     if url and "labs.google" in str(url):
                         ready = await page.evaluate(
@@ -314,66 +334,86 @@ class CaptchaService:
                             "&& typeof grecaptcha.enterprise.execute === 'function'"
                         )
                         if ready:
-                            logger.info("Reusing warm tab (grecaptcha ready)")
+                            logger.info(f"Reusing warm tab slot {slot}")
+                            tab_reused = True
                         else:
                             page = None
                     else:
                         page = None
                 except Exception:
                     page = None
-                    self._warm_tab_id = None
+                    self._warm_tabs[slot] = None
 
             if page is None:
-                page = await self._setup_warm_tab(cdp)
-            reused = self._warm_tab_id is not None
+                page = await self._setup_warm_tab(cdp, slot)
 
-            # Wait delay (skip on reused tab if < 3s since it's already warm)
-            effective_delay = wait_delay if not reused else min(wait_delay, 3)
+            effective_delay = min(wait_delay, 3) if tab_reused else wait_delay
             if effective_delay > 0:
-                logger.info(f"Waiting {effective_delay}s...")
+                logger.info(f"Slot {slot}: waiting {effective_delay}s...")
                 await asyncio.sleep(effective_delay)
 
-            # Extract token (retry once with fresh tab on context error)
+            # Token script with built-in grecaptcha wait (handles page reload race)
             token_script = f"""
                 (async () => {{
+                    for (let i = 0; i < 20; i++) {{
+                        if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
+                            && typeof grecaptcha.enterprise.execute === 'function') break;
+                        await new Promise(r => setTimeout(r, 500));
+                    }}
+                    if (typeof grecaptcha === 'undefined' || !grecaptcha.enterprise) {{
+                        return JSON.stringify({{ success: false, error: 'grecaptcha not available after wait' }});
+                    }}
                     try {{
                         const token = await grecaptcha.enterprise.execute(
                             '{SITE_KEY}', {{ action: '{action}' }}
                         );
+                        if (!token) return JSON.stringify({{ success: false, error: 'empty token' }});
                         return JSON.stringify({{ success: true, token: token }});
                     }} catch (e) {{
                         return JSON.stringify({{ success: false, error: e.message }});
                     }}
                 }})()
             """
-            for attempt in range(2):
+
+            # Retry up to 3 times: on evaluate exception OR on success:false
+            max_attempts = 3
+            for attempt in range(max_attempts):
                 try:
-                    raw = await page.evaluate(token_script, timeout=30)
-                    break
+                    raw = await page.evaluate(token_script, timeout=45)
                 except Exception as eval_err:
-                    if attempt == 0:
-                        logger.warning(f"Evaluate failed, creating fresh tab: {eval_err}")
-                        self._warm_tab_id = None
-                        page = await self._setup_warm_tab(cdp)
-                    else:
-                        raise
+                    if attempt < max_attempts - 1:
+                        logger.warning(f"Slot {slot} attempt {attempt+1}: evaluate exception: {eval_err}")
+                        self._warm_tabs[slot] = None
+                        page = await self._setup_warm_tab(cdp, slot)
+                        continue
+                    result.error = str(eval_err)
+                    self._warm_tabs[slot] = None
+                    return result
 
-            token_result = json.loads(raw) if isinstance(raw, str) else raw
+                token_result = json.loads(raw) if isinstance(raw, str) else raw
 
-            if token_result.get("success"):
-                result.token = token_result["token"]
-                logger.info(f"Got {action} token")
-            else:
-                result.error = token_result.get("error", "Unknown")
-                logger.error(f"Token failed: {result.error}")
-                self._warm_tab_id = None
+                if token_result.get("success") and token_result.get("token"):
+                    result.token = token_result["token"]
+                    logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1})")
+                    return result
+
+                error = token_result.get("error", "empty token")
+                if attempt < max_attempts - 1:
+                    logger.warning(f"Slot {slot} attempt {attempt+1}: {error} — recreating tab")
+                    self._warm_tabs[slot] = None
+                    page = await self._setup_warm_tab(cdp, slot)
+                    continue
+
+                result.error = error
+                logger.error(f"Token failed slot {slot} after {max_attempts} attempts: {error}")
+                self._warm_tabs[slot] = None
 
             return result
 
         except Exception as e:
-            logger.error(f"CDP extraction failed: {e}")
+            logger.error(f"CDP extraction failed slot {slot}: {e}")
             result.error = str(e)
-            self._warm_tab_id = None
+            self._warm_tabs[slot] = None
             return result
         finally:
             if cdp:
@@ -382,52 +422,44 @@ class CaptchaService:
                 except Exception:
                     pass
 
-    async def _run_in_thread(self, action: str, wait_delay: int = 0) -> CaptchaResult:
-        def run():
-            if sys.platform == "win32":
-                loop = asyncio.ProactorEventLoop()
-            else:
-                loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                result = loop.run_until_complete(self._extract_via_cdp(action, wait_delay))
-                pending = asyncio.all_tasks(loop)
-                for task in pending:
-                    task.cancel()
-                if pending:
-                    loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
-                return result
-            except Exception as e:
-                return CaptchaResult(action=action, error=str(e))
-            finally:
-                try:
-                    loop.run_until_complete(loop.shutdown_asyncgens())
-                except Exception:
-                    pass
-                loop.close()
-
-        return await asyncio.get_running_loop().run_in_executor(_executor, run)
-
     async def get_token(self, action: str) -> CaptchaResult:
         now = _time.time()
         if now < self._cooldown_until:
             wait = self._cooldown_until - now
             return CaptchaResult(action=action, error=f"Cooldown active, retry in {int(wait)}s")
 
-        sem = self._semaphore or asyncio.Semaphore(1)
-        async with sem:
-            result = await self._run_in_thread(action, self.wait_delay)
+        queue = self._tab_queue
+        if not queue:
+            queue = asyncio.Queue()
+            queue.put_nowait(0)
+            self._tab_queue = queue
+
+        try:
+            slot = await asyncio.wait_for(queue.get(), timeout=90)
+        except asyncio.TimeoutError:
+            return CaptchaResult(action=action, error="Timeout: all tab slots busy")
+
+        try:
+            now = _time.time()
+            if now < self._cooldown_until:
+                wait = self._cooldown_until - now
+                return CaptchaResult(action=action, error=f"Cooldown active, retry in {int(wait)}s")
+
+            result = await self._extract_via_cdp(action, self.wait_delay, slot)
             if result.token:
                 self._cooldown_until = _time.time() + self.cooldown
             else:
                 self._cooldown_until = _time.time() + self.cooldown_fail
             return result
+        finally:
+            queue.put_nowait(slot)
 
     async def open_for_login(self) -> str:
         old_headless = self.headless
         self.headless = False
         try:
-            port = self.ensure_chrome()
+            loop = asyncio.get_running_loop()
+            port = await loop.run_in_executor(_executor, self.ensure_chrome)
             return f"Chrome running on CDP port {port}. Login to Google."
         finally:
             self.headless = old_headless
@@ -444,7 +476,7 @@ class CaptchaService:
                     pass
             self._chrome_proc = None
             self._cdp_port = None
-            self._warm_tab_id = None
+            self._warm_tabs = {}
             logger.info("Chrome killed")
 
     async def close(self):

@@ -94,7 +94,10 @@ class VideoStatusRequest(BaseModel):
 
 async def _mint_recaptcha(action: str) -> str:
     service = get_captcha_service()
-    result = await service.get_token(action)
+    try:
+        result = await asyncio.wait_for(service.get_token(action), timeout=120)
+    except asyncio.TimeoutError:
+        raise HTTPException(503, "reCAPTCHA mint timeout (120s)")
 
     if result.token:
         return result.token

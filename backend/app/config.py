@@ -13,7 +13,7 @@ class Settings(BaseSettings):
     chrome_profile_dir: str = "chrome-profile"
 
     # Captcha defaults
-    max_concurrent: int = 3
+    max_concurrent: int = 32
     default_cooldown: int = 0
     default_cooldown_fail: int = 120
     default_wait_delay: int = 3

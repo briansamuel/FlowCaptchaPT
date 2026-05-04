@@ -5,6 +5,7 @@ import './index.css'
 import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import ApiKeys from './pages/ApiKeys'
+import Cookies from './pages/Cookies'
 import Settings from './pages/Settings'
 import Logs from './pages/Logs'
 
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
         <Route element={<Layout />}>
           <Route path="/" element={<Dashboard />} />
           <Route path="/keys" element={<ApiKeys />} />
+          <Route path="/cookies" element={<Cookies />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/logs" element={<Logs />} />
         </Route>

@@ -197,17 +197,23 @@ async def import_cookies(
     import sys
 
     service = get_captcha_service()
+    chrome_path = service._find_system_chrome()
 
     async def _inject():
         from playwright.async_api import async_playwright
         service._cleanup_locks()
         pw = await async_playwright().start()
         try:
+            launch_args = {
+                "headless": True,
+                "args": ["--disable-blink-features=AutomationControlled", "--no-sandbox"],
+                "ignore_default_args": ["--enable-automation"],
+            }
+            if chrome_path:
+                launch_args["executable_path"] = chrome_path
             ctx = await pw.chromium.launch_persistent_context(
                 service.profile_dir,
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--no-sandbox"],
-                ignore_default_args=["--enable-automation"],
+                **launch_args,
             )
             await ctx.add_cookies(pw_cookies)
             # Verify

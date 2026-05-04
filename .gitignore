@@ -1,16 +1,34 @@
+# Python
 __pycache__/
 *.pyc
 *.pyo
-venv/
-.env
-*.db
-chrome-profile/
-chrome-profile-docker/
-data/
-data-docker/
-node_modules/
-dist/
+backend/venv/
+backend/.env
+
+# Data (runtime)
+backend/data/
+backend/data-docker/
+backend/chrome-profile/
+backend/chrome-profile-docker/
+
+# Test files
+backend/test_*.py
+test_*.py
+
+# Frontend build
+frontend-react/node_modules/
+frontend-react/dist/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
 .DS_Store
 Thumbs.db
+$null
 backend/$null
-test_endpoints.py
+
+# Misc
+import-cookies.json
+*.log

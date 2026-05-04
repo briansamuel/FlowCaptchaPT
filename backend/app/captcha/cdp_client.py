@@ -14,7 +14,7 @@ import aiohttp
 logger = logging.getLogger(__name__)
 
 SITE_KEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV"
-TARGET_URL = "https://labs.google/fx/tools/flow"
+TARGET_URL = "https://labs.google/"
 
 
 class RawCDPClient:

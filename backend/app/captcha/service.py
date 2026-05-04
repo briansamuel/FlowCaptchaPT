@@ -20,7 +20,8 @@ logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=2)
 
 SITE_KEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV"
-TARGET_URL = "https://labs.google/fx/tools/flow"
+TARGET_URL = "https://labs.google/"
+RECAPTCHA_SCRIPT_URL = f"https://www.google.com/recaptcha/enterprise.js?render={SITE_KEY}"
 
 
 @dataclass
@@ -70,21 +71,15 @@ class CaptchaService:
         profile = Path(self.profile_dir)
         for fname in ["SingletonLock", "SingletonSocket", "SingletonCookie"]:
             f = profile / fname
-            if f.exists():
+            try:
+                f.unlink(missing_ok=True)
+            except OSError:
+                # On Windows, SingletonLock is a symlink that Path.unlink()
+                # may fail with WinError 1920. Force-remove via os.remove.
                 try:
-                    f.unlink()
-                    logger.info(f"Removed stale lock: {fname}")
+                    os.remove(str(f))
                 except OSError:
-                    # Windows: file locked by another process, force kill Chrome
-                    logger.warning(f"Cannot remove {fname}, killing stale Chrome...")
-                    self._kill_stale_chrome()
-                    import time as _t
-                    _t.sleep(1)
-                    try:
-                        f.unlink()
-                        logger.info(f"Removed {fname} after killing Chrome")
-                    except Exception as e:
-                        logger.error(f"Still cannot remove {fname}: {e}")
+                    pass
 
     def _is_chrome_alive(self) -> bool:
         if not self._chrome_proc or self._chrome_proc.poll() is not None:
@@ -143,7 +138,7 @@ class CaptchaService:
                 "--disable-default-apps",
                 "--disable-sync",
                 "--disable-translate",
-                "--disable-features=TranslateUI,MediaRouter,OptimizationHints",
+                "--disable-features=TranslateUI,MediaRouter,OptimizationHints,VizDisplayCompositor",
                 "--disable-component-update",
                 "--disable-background-networking",
                 "--disable-background-timer-throttling",
@@ -153,6 +148,8 @@ class CaptchaService:
                 "--disable-hang-monitor",
                 "--no-pings",
                 "--metrics-recording-only",
+                "--disable-crash-reporter",
+                "--disable-breakpad",
                 "--window-size=800,600",
                 "--window-position=9999,9999",
                 "--start-minimized",
@@ -246,6 +243,54 @@ class CaptchaService:
         except Exception:
             pass
 
+    async def _setup_warm_tab(self, cdp):
+        """Create a new tab on labs.google and inject reCAPTCHA script."""
+        target_id = await cdp.create_tab(TARGET_URL)
+        page = await cdp.attach_to_target(target_id)
+        self._warm_tab_id = target_id
+
+        for _ in range(30):
+            try:
+                state = await page.evaluate("document.readyState")
+                if state in ("complete", "interactive"):
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(1)
+
+        await asyncio.sleep(1)
+
+        inject_js = f"""
+            (async () => {{
+                if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise) return 'already';
+                return new Promise((resolve, reject) => {{
+                    const s = document.createElement('script');
+                    s.src = '{RECAPTCHA_SCRIPT_URL}';
+                    s.onload = () => resolve('loaded');
+                    s.onerror = (e) => reject('script_error');
+                    document.head.appendChild(s);
+                }});
+            }})()
+        """
+        await page.evaluate(inject_js, timeout=15)
+
+        for i in range(30):
+            try:
+                ready = await page.evaluate(
+                    "typeof grecaptcha !== 'undefined' && grecaptcha.enterprise "
+                    "&& typeof grecaptcha.enterprise.execute === 'function'"
+                )
+                if ready:
+                    break
+            except Exception:
+                pass
+            await asyncio.sleep(0.5)
+        else:
+            raise RuntimeError("grecaptcha not ready after 15s")
+
+        logger.info("New tab ready, grecaptcha injected")
+        return page
+
     async def _extract_via_cdp(self, action: str, wait_delay: int = 0) -> CaptchaResult:
         """Reuse warm tab if possible, otherwise create new one. Extract token."""
         from .cdp_client import RawCDPClient
@@ -258,12 +303,10 @@ class CaptchaService:
             cdp = RawCDPClient(port)
             await cdp.connect()
 
-            # Try to reuse warm tab (already has grecaptcha loaded)
-            reused = False
+            page = None
             if self._warm_tab_id:
                 try:
                     page = await cdp.attach_to_target(self._warm_tab_id)
-                    # Verify tab is still on Flow page with grecaptcha
                     url = await page.evaluate("window.location.href")
                     if url and "labs.google" in str(url):
                         ready = await page.evaluate(
@@ -271,46 +314,18 @@ class CaptchaService:
                             "&& typeof grecaptcha.enterprise.execute === 'function'"
                         )
                         if ready:
-                            reused = True
                             logger.info("Reusing warm tab (grecaptcha ready)")
+                        else:
+                            page = None
+                    else:
+                        page = None
                 except Exception:
+                    page = None
                     self._warm_tab_id = None
 
-            if not reused:
-                # Create new tab with Flow URL
-                target_id = await cdp.create_tab(TARGET_URL)
-                page = await cdp.attach_to_target(target_id)
-                self._warm_tab_id = target_id
-
-                # Wait for page load
-                for _ in range(30):
-                    try:
-                        state = await page.evaluate("document.readyState")
-                        if state in ("complete", "interactive"):
-                            break
-                    except Exception:
-                        pass
-                    await asyncio.sleep(1)
-
-                await asyncio.sleep(2)  # Let async scripts load
-
-                # Wait for grecaptcha
-                for i in range(60):
-                    try:
-                        ready = await page.evaluate(
-                            "typeof grecaptcha !== 'undefined' && grecaptcha.enterprise "
-                            "&& typeof grecaptcha.enterprise.execute === 'function'"
-                        )
-                        if ready:
-                            break
-                    except Exception:
-                        pass
-                    await asyncio.sleep(0.5)
-                else:
-                    result.error = "grecaptcha not ready after 30s"
-                    return result
-
-                logger.info("New tab ready, grecaptcha loaded")
+            if page is None:
+                page = await self._setup_warm_tab(cdp)
+            reused = self._warm_tab_id is not None
 
             # Wait delay (skip on reused tab if < 3s since it's already warm)
             effective_delay = wait_delay if not reused else min(wait_delay, 3)
@@ -318,7 +333,7 @@ class CaptchaService:
                 logger.info(f"Waiting {effective_delay}s...")
                 await asyncio.sleep(effective_delay)
 
-            # Extract token
+            # Extract token (retry once with fresh tab on context error)
             token_script = f"""
                 (async () => {{
                     try {{
@@ -331,16 +346,26 @@ class CaptchaService:
                     }}
                 }})()
             """
-            raw = await page.evaluate(token_script, timeout=30)
+            for attempt in range(2):
+                try:
+                    raw = await page.evaluate(token_script, timeout=30)
+                    break
+                except Exception as eval_err:
+                    if attempt == 0:
+                        logger.warning(f"Evaluate failed, creating fresh tab: {eval_err}")
+                        self._warm_tab_id = None
+                        page = await self._setup_warm_tab(cdp)
+                    else:
+                        raise
+
             token_result = json.loads(raw) if isinstance(raw, str) else raw
 
             if token_result.get("success"):
                 result.token = token_result["token"]
-                logger.info(f"Got {action} token ({'reused' if reused else 'new'} tab)")
+                logger.info(f"Got {action} token")
             else:
                 result.error = token_result.get("error", "Unknown")
                 logger.error(f"Token failed: {result.error}")
-                # Invalidate warm tab on error
                 self._warm_tab_id = None
 
             return result

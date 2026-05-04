@@ -53,12 +53,14 @@ from .api.keys import router as keys_router
 from .api.settings_api import router as settings_router
 from .api.dashboard import router as dashboard_router
 from .api.logs import router as logs_router
+from .api.flow import router as flow_router
 
 app.include_router(captcha_router)
 app.include_router(keys_router)
 app.include_router(settings_router)
 app.include_router(dashboard_router)
 app.include_router(logs_router)
+app.include_router(flow_router)
 
 
 @app.get("/api/health")

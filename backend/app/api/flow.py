@@ -24,6 +24,12 @@ FLOW_API_BASE = "https://aisandbox-pa.googleapis.com/v1"
 # Request / Response models
 # ---------------------------------------------------------------------------
 
+class ImageReference(BaseModel):
+    base64: str
+    mimeType: str = "image/jpeg"
+    fileName: Optional[str] = None
+
+
 class ImageGenerateRequest(BaseModel):
     accessToken: str
     projectId: str
@@ -31,9 +37,12 @@ class ImageGenerateRequest(BaseModel):
     aspectRatio: str = "IMAGE_ASPECT_RATIO_SQUARE"
     imageModel: str = "GEM_PIX_2"
     seed: Optional[int] = None
+    # Single image (backward compatible)
     referenceImageBase64: Optional[str] = None
     referenceImageMimeType: str = "image/jpeg"
     referenceImageFileName: Optional[str] = None
+    # Multiple images
+    referenceImages: Optional[List[ImageReference]] = None
 
 
 class ImageUpscaleRequest(BaseModel):
@@ -150,12 +159,30 @@ FLOW_MAX_RETRIES = 3
 FLOW_RETRY_DELAY = 10
 
 ERROR_MESSAGES_VI = {
-    "PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED": "Nội dung bị chặn: chứa hình ảnh người nổi tiếng",
-    "PUBLIC_ERROR_UNUSUAL_ACTIVITY": "Hoạt động bất thường, đang thử lại...",
+    # Policy / Content filters
+    "PUBLIC_ERROR_PROMINENT_PEOPLE_UPLOAD": "Ảnh chứa người nổi tiếng - Google không cho phép upload",
+    "PUBLIC_ERROR_PROMINENT_PEOPLE": "Video chứa người nổi tiếng - không được phép sử dụng",
+    "PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED": "Nội dung chứa người nổi tiếng - không cho phép tạo",
+    "PUBLIC_ERROR_SEXUAL": "Vi phạm chính sách nội dung người lớn",
+    "PUBLIC_ERROR_UNSAFE": "Nội dung không an toàn - vi phạm chính sách",
+    "PUBLIC_ERROR_UNSAFE_GENERATION": "Nội dung không an toàn - vi phạm chính sách",
+    "PUBLIC_ERROR_VIOLENCE": "Nội dung chứa bạo lực",
+    "PUBLIC_ERROR_IP_INPUT_IMAGE": "Ảnh vi phạm bản quyền sở hữu trí tuệ (IP)",
+    "PUBLIC_ERROR_MINOR_UPLOAD": "Ảnh chứa trẻ vị thành niên - không cho phép upload",
+    "PUBLIC_ERROR_CHILD_SAFETY": "Vi phạm chính sách bảo vệ trẻ em",
+    "PUBLIC_ERROR_DECEPTIVE": "Nội dung lừa đảo hoặc gây hiểu lầm",
+    "PUBLIC_ERROR_HATE_SPEECH": "Nội dung chứa ngôn từ thù địch",
+    "PUBLIC_ERROR_DANGEROUS": "Nội dung nguy hiểm hoặc có hại",
+    "PUBLIC_ERROR_AUDIO_FILTERED": "Audio bị lọc do vi phạm chính sách",
+    "PUBLIC_ERROR_NSFW_FILTER_TRIGGERED": "Vi phạm chính sách nội dung người lớn",
     "PUBLIC_ERROR_SAFETY_FILTER_TRIGGERED": "Nội dung bị chặn bởi bộ lọc an toàn",
+    "SEXUALLY_EXPLICIT": "Vi phạm chính sách nội dung người lớn",
+    # Generation errors
     "PUBLIC_ERROR_IMAGE_GENERATION_FAILED": "Tạo ảnh thất bại",
     "PUBLIC_ERROR_VIDEO_GENERATION_FAILED": "Tạo video thất bại",
-    "PUBLIC_ERROR_NSFW_FILTER_TRIGGERED": "Nội dung bị chặn: vi phạm chính sách nội dung",
+    # Quota / Auth / Rate
+    "PUBLIC_ERROR_UNUSUAL_ACTIVITY": "Hoạt động bất thường, đang thử lại...",
+    "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC": "Quá nhiều request, vui lòng chờ 20s",
     "PUBLIC_ERROR_RATE_LIMIT_EXCEEDED": "Vượt quá giới hạn tốc độ, vui lòng thử lại sau",
     "PUBLIC_ERROR_QUOTA_EXCEEDED": "Hết credit, vui lòng nạp thêm",
 }
@@ -174,15 +201,23 @@ def _parse_flow_error(text: str, status_code: int) -> tuple[str, str, bool]:
     except (json.JSONDecodeError, KeyError):
         pass
 
-    is_retryable = "unusual" in text.lower() or status_code == 503
+    is_retryable = (
+        ("unusual" in text.lower() and "too_much_traffic" not in text.lower())
+        or status_code == 503
+    )
     vi_msg = ERROR_MESSAGES_VI.get(reason)
     if not vi_msg:
-        if status_code == 401:
+        lower = text.lower()
+        if "content moderation" in lower or "sexually_explicit" in lower:
+            vi_msg = "Nội dung không vượt qua kiểm duyệt"
+        elif status_code == 401:
             vi_msg = "Token xác thực hết hạn hoặc không hợp lệ"
         elif status_code == 403:
             vi_msg = "Không có quyền truy cập"
-        elif "upload" in text.lower() or "image" in text.lower():
-            vi_msg = "Lỗi xử lý ảnh"
+        elif "upload" in lower:
+            vi_msg = "Lỗi upload ảnh"
+        elif "image" in lower:
+            vi_msg = "Lỗi tạo ảnh"
         else:
             vi_msg = "Lỗi tạo nội dung"
 
@@ -209,6 +244,10 @@ async def _flow_request(
                     return await resp.json()
                 text = await resp.text()
                 reason, vi_msg, is_retryable = _parse_flow_error(text, resp.status)
+                if reason == "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC":
+                    logger.warning(f"Flow API [{reason}]: {vi_msg}. Delay 20s...")
+                    await asyncio.sleep(20)
+                    raise HTTPException(resp.status, vi_msg)
                 if is_retryable and attempt < FLOW_MAX_RETRIES:
                     logger.warning(
                         f"Flow API {resp.status} [{reason}] (lần {attempt}/{FLOW_MAX_RETRIES}): {vi_msg}. "
@@ -285,20 +324,34 @@ async def _upload_user_image(
 
 @router.post("/images/generate")
 async def generate_image(req: ImageGenerateRequest):
-    """Generate image (T2I). Include referenceImageBase64 for I2I."""
+    """Generate image (T2I). Include referenceImages or referenceImageBase64 for I2I."""
     image_inputs: list = []
-    if req.referenceImageBase64:
-        ref_id = await _upload_reference_image(
-            req.accessToken,
-            req.projectId,
-            req.referenceImageBase64,
-            req.referenceImageMimeType,
-            req.referenceImageFileName,
+    upload_tasks: list = []
+
+    if req.referenceImages:
+        for ref in req.referenceImages:
+            upload_tasks.append(
+                _upload_reference_image(
+                    req.accessToken, req.projectId,
+                    ref.base64, ref.mimeType, ref.fileName,
+                )
+            )
+    elif req.referenceImageBase64:
+        upload_tasks.append(
+            _upload_reference_image(
+                req.accessToken, req.projectId,
+                req.referenceImageBase64, req.referenceImageMimeType,
+                req.referenceImageFileName,
+            )
         )
-        image_inputs.append({
-            "name": ref_id,
-            "imageInputType": "IMAGE_INPUT_TYPE_REFERENCE",
-        })
+
+    if upload_tasks:
+        ref_ids = await asyncio.gather(*upload_tasks)
+        for ref_id in ref_ids:
+            image_inputs.append({
+                "name": ref_id,
+                "imageInputType": "IMAGE_INPUT_TYPE_REFERENCE",
+            })
 
     recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
     ctx = _client_context(req.projectId, recaptcha)

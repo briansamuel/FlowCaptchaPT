@@ -18,7 +18,9 @@ from typing import Optional
 
 logger = logging.getLogger(__name__)
 
-MAX_TAB_POOL = 8
+from ..config import settings as _settings
+
+MAX_TAB_POOL = _settings.max_tab_pool
 
 # Only for blocking ensure_chrome() — 2 workers is enough
 _executor = ThreadPoolExecutor(max_workers=2)

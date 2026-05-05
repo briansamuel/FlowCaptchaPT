@@ -14,6 +14,7 @@ class Settings(BaseSettings):
 
     # Captcha defaults
     max_concurrent: int = 32
+    max_tab_pool: int = 8
     default_cooldown: int = 0
     default_cooldown_fail: int = 120
     default_wait_delay: int = 3

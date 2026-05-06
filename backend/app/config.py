@@ -20,6 +20,10 @@ class Settings(BaseSettings):
     default_wait_delay: int = 3
     headless: bool = False
 
+    # Proxy for Flow API (e.g. "http://user:pass@ip:port" or "socks5://ip:port")
+    flow_proxy: str = ""
+    flow_proxy_enabled: bool = False
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

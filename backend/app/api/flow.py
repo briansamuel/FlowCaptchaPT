@@ -8,11 +8,13 @@ import uuid
 from typing import Optional, List
 
 import aiohttp
+from aiohttp_socks import ProxyConnector
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from ..captcha.service import get_captcha_service
 from ..captcha.queue import job_queue, JobStatus
+from ..config import settings as _settings
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/flow", tags=["flow"])
@@ -224,6 +226,13 @@ def _parse_flow_error(text: str, status_code: int) -> tuple[str, str, bool]:
     return reason, vi_msg, is_retryable
 
 
+def _get_connector():
+    if _settings.flow_proxy_enabled and _settings.flow_proxy:
+        logger.info(f"Flow API using proxy: {_settings.flow_proxy}")
+        return ProxyConnector.from_url(_settings.flow_proxy)
+    return None
+
+
 async def _flow_request(
     method: str,
     url: str,
@@ -232,7 +241,8 @@ async def _flow_request(
     timeout_s: int = 120,
 ) -> dict:
     for attempt in range(1, FLOW_MAX_RETRIES + 1):
-        async with aiohttp.ClientSession() as session:
+        connector = _get_connector()
+        async with aiohttp.ClientSession(connector=connector) as session:
             async with session.request(
                 method,
                 url,
@@ -642,4 +652,35 @@ async def check_video_status(req: VideoStatusRequest):
         "completed": completed,
         "operations": statuses,
         "remainingCredits": remaining_credits,
+    }
+
+
+# ---------------------------------------------------------------------------
+# Proxy management
+# ---------------------------------------------------------------------------
+
+class ProxyUpdateRequest(BaseModel):
+    enabled: Optional[bool] = None
+    proxy: Optional[str] = None
+
+
+@router.get("/proxy")
+async def get_proxy_status():
+    return {
+        "enabled": _settings.flow_proxy_enabled,
+        "proxy": _settings.flow_proxy if _settings.flow_proxy else None,
+    }
+
+
+@router.post("/proxy")
+async def update_proxy(req: ProxyUpdateRequest):
+    if req.enabled is not None:
+        _settings.flow_proxy_enabled = req.enabled
+    if req.proxy is not None:
+        _settings.flow_proxy = req.proxy
+    logger.info(f"Proxy updated: enabled={_settings.flow_proxy_enabled}, proxy={_settings.flow_proxy or 'none'}")
+    return {
+        "success": True,
+        "enabled": _settings.flow_proxy_enabled,
+        "proxy": _settings.flow_proxy if _settings.flow_proxy else None,
     }

@@ -201,10 +201,7 @@ def _parse_flow_error(text: str, status_code: int) -> tuple[str, str, bool]:
     except (json.JSONDecodeError, KeyError):
         pass
 
-    is_retryable = (
-        ("unusual" in text.lower() and "too_much_traffic" not in text.lower())
-        or status_code == 503
-    )
+    is_retryable = status_code == 503
     vi_msg = ERROR_MESSAGES_VI.get(reason)
     if not vi_msg:
         lower = text.lower()
@@ -230,7 +227,9 @@ async def _flow_request(
     access_token: str,
     body: dict = None,
     timeout_s: int = 120,
+    project_id: str = "",
 ) -> dict:
+    tag = f"[{project_id[:8]}]" if project_id else ""
     async with aiohttp.ClientSession() as session:
         for attempt in range(1, FLOW_MAX_RETRIES + 1):
             try:
@@ -246,24 +245,24 @@ async def _flow_request(
                     text = await resp.text()
                     reason, vi_msg, is_retryable = _parse_flow_error(text, resp.status)
                     if reason == "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC":
-                        logger.warning(f"Flow API [{reason}]: {vi_msg}. Delay 20s...")
+                        logger.warning(f"{tag} Flow API [{reason}]: {vi_msg}. Delay 20s...")
                         await asyncio.sleep(20)
                         raise HTTPException(resp.status, vi_msg)
                     if is_retryable and attempt < FLOW_MAX_RETRIES:
                         logger.warning(
-                            f"Flow API {resp.status} [{reason}] (lần {attempt}/{FLOW_MAX_RETRIES}): {vi_msg}. "
+                            f"{tag} Flow API {resp.status} [{reason}] (lần {attempt}/{FLOW_MAX_RETRIES}): {vi_msg}. "
                             f"Thử lại sau {FLOW_RETRY_DELAY}s..."
                         )
                         await asyncio.sleep(FLOW_RETRY_DELAY)
                         continue
-                    logger.error(f"Flow API {resp.status} [{reason}]: {vi_msg}")
+                    logger.error(f"{tag} Flow API {resp.status} [{reason}]: {vi_msg}")
                     raise HTTPException(resp.status, vi_msg)
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
                 if attempt < FLOW_MAX_RETRIES:
-                    logger.warning(f"Flow API connection error (lần {attempt}/{FLOW_MAX_RETRIES}): {e}. Thử lại...")
+                    logger.warning(f"{tag} Flow API connection error (lần {attempt}/{FLOW_MAX_RETRIES}): {e}. Thử lại...")
                     await asyncio.sleep(FLOW_RETRY_DELAY)
                     continue
-                logger.error(f"Flow API connection error: {e}")
+                logger.error(f"{tag} Flow API connection error: {e}")
                 raise HTTPException(502, f"Lỗi kết nối tới Google API: {type(e).__name__}")
 
 
@@ -290,6 +289,7 @@ async def _upload_reference_image(
     }
     result = await _flow_request(
         "POST", f"{FLOW_API_BASE}/flow/uploadImage", access_token, body,
+        project_id=project_id,
     )
     media_id = result.get("media", {}).get("name")
     if not media_id:
@@ -385,6 +385,7 @@ async def generate_image(req: ImageGenerateRequest):
         f"{FLOW_API_BASE}/projects/{req.projectId}/flowMedia:batchGenerateImages",
         req.accessToken,
         body,
+        project_id=req.projectId,
     )
 
     media_out = []
@@ -426,6 +427,7 @@ async def upscale_image(req: ImageUpscaleRequest):
         req.accessToken,
         body,
         timeout_s=300,
+        project_id=req.projectId,
     )
 
     return {"success": True, "encodedImage": result.get("encodedImage")}
@@ -538,7 +540,7 @@ async def generate_video(req: VideoGenerateRequest):
             "requests": [req_item],
         }
 
-    result = await _flow_request("POST", endpoint, req.accessToken, body)
+    result = await _flow_request("POST", endpoint, req.accessToken, body, project_id=req.projectId)
 
     operations = []
     for op in result.get("operations", []):
@@ -582,6 +584,7 @@ async def upscale_video(req: VideoUpscaleRequest):
         f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoUpsampleVideo",
         req.accessToken,
         body,
+        project_id=req.projectId,
     )
 
     operations = []

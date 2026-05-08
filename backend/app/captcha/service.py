@@ -26,7 +26,7 @@ MAX_TAB_POOL = _settings.max_tab_pool
 _executor = ThreadPoolExecutor(max_workers=2)
 
 SITE_KEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV"
-TARGET_URL = "https://labs.google/"
+TARGET_URL = "https://labs.google/fx"
 RECAPTCHA_SCRIPT_URL = f"https://www.google.com/recaptcha/enterprise.js?render={SITE_KEY}"
 
 
@@ -266,7 +266,7 @@ class CaptchaService:
                 pass
 
     async def _setup_warm_tab(self, cdp, slot: int = 0):
-        """Create a new tab on labs.google and inject reCAPTCHA script."""
+        """Create a new tab on labs.google/fx and wait for reCAPTCHA to load naturally."""
         old_tab = self._warm_tabs.get(slot)
         if old_tab:
             try:
@@ -279,6 +279,7 @@ class CaptchaService:
         page = await cdp.attach_to_target(target_id)
         self._warm_tabs[slot] = target_id
 
+        # Wait for page load
         for _ in range(30):
             try:
                 state = await page.evaluate("document.readyState")
@@ -288,41 +289,108 @@ class CaptchaService:
                 pass
             await asyncio.sleep(1)
 
-        await asyncio.sleep(1)
+        # Let page settle and reCAPTCHA script initialize naturally
+        await asyncio.sleep(2)
 
-        inject_js = f"""
+        # Single evaluate: check if reCAPTCHA loaded, inject if not, then wait
+        bootstrap_js = f"""
             (async () => {{
-                if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise) return 'already';
-                return new Promise((resolve, reject) => {{
+                // Check if already loaded by the page
+                if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
+                    && typeof grecaptcha.enterprise.execute === 'function') {{
+                    return 'ready';
+                }}
+                // Inject script if not present
+                const existing = document.querySelector('script[src*="recaptcha/enterprise"]');
+                if (!existing) {{
                     const s = document.createElement('script');
                     s.src = '{RECAPTCHA_SCRIPT_URL}';
-                    s.onload = () => resolve('loaded');
-                    s.onerror = (e) => reject('script_error');
                     document.head.appendChild(s);
-                }});
+                }}
+                // Wait for it to become ready
+                for (let i = 0; i < 40; i++) {{
+                    if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
+                        && typeof grecaptcha.enterprise.execute === 'function') {{
+                        return 'ready';
+                    }}
+                    await new Promise(r => setTimeout(r, 500));
+                }}
+                return 'timeout';
             }})()
         """
-        await page.evaluate(inject_js, timeout=15)
+        result = await page.evaluate(bootstrap_js, timeout=25)
+        if result == 'timeout':
+            raise RuntimeError("grecaptcha not ready after 20s")
 
-        for i in range(30):
-            try:
-                ready = await page.evaluate(
-                    "typeof grecaptcha !== 'undefined' && grecaptcha.enterprise "
-                    "&& typeof grecaptcha.enterprise.execute === 'function'"
-                )
-                if ready:
-                    break
-            except Exception:
-                pass
-            await asyncio.sleep(0.5)
-        else:
-            raise RuntimeError("grecaptcha not ready after 15s")
+        # Perform initial trusted input to build reCAPTCHA observation history
+        await self._simulate_human_input(page)
 
-        logger.info(f"Tab slot {slot} ready, grecaptcha injected (tab={target_id[:12]})")
+        logger.info(f"Tab slot {slot} ready (tab={target_id[:12]})")
         return page
 
+    async def _simulate_human_input(self, page):
+        """Simulate human behavior using CDP Input domain (trusted events, isTrusted=true)."""
+        import random
+
+        try:
+            # Realistic mouse movement with bezier-like trajectory
+            # Start from a random position
+            cx, cy = random.randint(200, 600), random.randint(150, 400)
+            await page.mouse_move(cx, cy)
+            await asyncio.sleep(random.uniform(0.3, 0.8))
+
+            # Move mouse in organic pattern (5-8 movements)
+            for _ in range(random.randint(5, 8)):
+                # Small incremental moves (humans don't teleport)
+                dx = random.randint(-120, 120)
+                dy = random.randint(-80, 80)
+                cx = max(50, min(1200, cx + dx))
+                cy = max(50, min(800, cy + dy))
+                await page.mouse_move(cx, cy)
+                await asyncio.sleep(random.uniform(0.05, 0.25))
+
+            # Pause (human reading/thinking)
+            await asyncio.sleep(random.uniform(0.5, 1.5))
+
+            # Scroll down naturally
+            scroll_x = random.randint(400, 800)
+            scroll_y = random.randint(300, 500)
+            await page.scroll(scroll_x, scroll_y, delta_y=random.randint(80, 200))
+            await asyncio.sleep(random.uniform(0.4, 1.0))
+
+            # More mouse movement
+            for _ in range(random.randint(2, 4)):
+                cx += random.randint(-80, 80)
+                cy += random.randint(-60, 60)
+                cx = max(50, min(1200, cx))
+                cy = max(50, min(800, cy))
+                await page.mouse_move(cx, cy)
+                await asyncio.sleep(random.uniform(0.08, 0.2))
+
+            # Scroll up a bit
+            await page.scroll(scroll_x, scroll_y, delta_y=random.randint(-100, -30))
+            await asyncio.sleep(random.uniform(0.3, 0.7))
+
+            # Optional: click somewhere neutral (body area)
+            if random.random() > 0.5:
+                await page.mouse_click(
+                    random.randint(300, 900),
+                    random.randint(200, 600)
+                )
+                await asyncio.sleep(random.uniform(0.2, 0.5))
+
+        except Exception as e:
+            # Non-critical — don't fail if input simulation has issues
+            logger.debug(f"Human simulation partial: {e}")
+
     async def _extract_via_cdp(self, action: str, wait_delay: int = 0, slot: int = 0) -> CaptchaResult:
-        """Runs on main event loop. Each slot is independent."""
+        """Runs on main event loop. Each slot is independent.
+        
+        Optimized for reCAPTCHA score:
+        - Uses CDP Input domain for trusted events (isTrusted=true)
+        - Minimizes Runtime.evaluate calls (only 1 for token mint)
+        - Longer observation window for reCAPTCHA to collect signals
+        """
         from .cdp_client import RawCDPClient
 
         result = CaptchaResult(action=action)
@@ -342,17 +410,19 @@ class CaptchaService:
             if tab_id:
                 try:
                     page = await cdp.attach_to_target(tab_id)
-                    url = await page.evaluate("window.location.href")
-                    if url and "labs.google" in str(url):
-                        ready = await page.evaluate(
-                            "typeof grecaptcha !== 'undefined' && grecaptcha.enterprise "
-                            "&& typeof grecaptcha.enterprise.execute === 'function'"
-                        )
-                        if ready:
-                            logger.info(f"Reusing warm tab slot {slot}")
-                            tab_reused = True
-                        else:
-                            page = None
+                    # Single evaluate to check both URL and grecaptcha readiness
+                    check = await page.evaluate(
+                        "(() => {"
+                        "  const url = window.location.href;"
+                        "  const ready = typeof grecaptcha !== 'undefined' && grecaptcha.enterprise"
+                        "    && typeof grecaptcha.enterprise.execute === 'function';"
+                        "  return JSON.stringify({url, ready});"
+                        "})()"
+                    )
+                    check_data = json.loads(check) if isinstance(check, str) else {}
+                    if check_data.get("ready") and "labs.google" in str(check_data.get("url", "")):
+                        logger.info(f"Reusing warm tab slot {slot}")
+                        tab_reused = True
                     else:
                         page = None
                 except Exception:
@@ -362,48 +432,35 @@ class CaptchaService:
             if page is None:
                 page = await self._setup_warm_tab(cdp, slot)
 
-            effective_delay = min(wait_delay, 5) if tab_reused else wait_delay
-            if effective_delay > 0:
-                logger.info(f"Slot {slot}: waiting {effective_delay}s...")
-                await asyncio.sleep(effective_delay)
-
-            # Simulate human-like behavior before minting
+            # Observation window: let reCAPTCHA collect behavioral signals
+            # For reused tabs, shorter delay (already has history)
+            # For fresh tabs, longer delay (needs to build trust)
             import random
-            try:
-                simulate_js = """
-                    (async () => {
-                        // Mouse movements
-                        for (let i = 0; i < 3 + Math.floor(Math.random()*3); i++) {
-                            const x = 100 + Math.floor(Math.random()*800);
-                            const y = 100 + Math.floor(Math.random()*500);
-                            window.dispatchEvent(new MouseEvent('mousemove', {clientX: x, clientY: y, bubbles: true}));
-                            await new Promise(r => setTimeout(r, 200 + Math.random()*400));
-                        }
-                        // Scroll
-                        window.scrollBy(0, 50 + Math.floor(Math.random()*200));
-                        await new Promise(r => setTimeout(r, 300 + Math.random()*500));
-                        window.scrollBy(0, -(30 + Math.floor(Math.random()*100)));
-                        await new Promise(r => setTimeout(r, 200 + Math.random()*300));
-                        // Focus/blur
-                        window.dispatchEvent(new Event('focus'));
-                        await new Promise(r => setTimeout(r, 500 + Math.random()*1000));
-                        return 'done';
-                    })()
-                """
-                await page.evaluate(simulate_js, timeout=15)
-            except Exception:
-                pass
+            if tab_reused:
+                obs_delay = random.uniform(2, 5)
+            else:
+                obs_delay = random.uniform(8, 15)
 
-            # Token script with built-in grecaptcha wait (handles page reload race)
+            # Add configured wait_delay on top
+            total_delay = obs_delay + min(wait_delay, 10)
+            logger.info(f"Slot {slot}: observation window {total_delay:.1f}s (reused={tab_reused})")
+
+            # During observation, perform trusted human input
+            await self._simulate_human_input(page)
+            remaining = total_delay - 3  # ~3s spent on simulation
+            if remaining > 0:
+                # Idle period (human reading/thinking)
+                await asyncio.sleep(remaining * 0.6)
+                # One more burst of activity before mint
+                await self._simulate_human_input(page)
+                await asyncio.sleep(remaining * 0.4)
+
+            # --- Token mint: single evaluate call ---
             token_script = f"""
                 (async () => {{
-                    for (let i = 0; i < 20; i++) {{
-                        if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
-                            && typeof grecaptcha.enterprise.execute === 'function') break;
-                        await new Promise(r => setTimeout(r, 500));
-                    }}
-                    if (typeof grecaptcha === 'undefined' || !grecaptcha.enterprise) {{
-                        return JSON.stringify({{ success: false, error: 'grecaptcha not available after wait' }});
+                    if (typeof grecaptcha === 'undefined' || !grecaptcha.enterprise
+                        || typeof grecaptcha.enterprise.execute !== 'function') {{
+                        return JSON.stringify({{ success: false, error: 'grecaptcha not available' }});
                     }}
                     try {{
                         const token = await grecaptcha.enterprise.execute(
@@ -417,7 +474,7 @@ class CaptchaService:
                 }})()
             """
 
-            # Retry up to 3 times: on evaluate exception OR on success:false
+            # Retry up to 3 times
             max_attempts = 3
             for attempt in range(max_attempts):
                 try:

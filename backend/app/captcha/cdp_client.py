@@ -205,3 +205,55 @@ class PageSession:
         if remote_obj.get("type") == "undefined":
             return None
         return remote_obj.get("value")
+
+    # --- Trusted Input Methods (isTrusted=true) ---
+    # These use CDP Input domain which generates real browser input events
+
+    async def mouse_move(self, x: float, y: float):
+        """Dispatch trusted mouseMoved event via CDP Input domain."""
+        await self.send("Input.dispatchMouseEvent", {
+            "type": "mouseMoved",
+            "x": x,
+            "y": y,
+        })
+
+    async def mouse_click(self, x: float, y: float, button: str = "left"):
+        """Dispatch trusted mouse click (press + release) via CDP Input domain."""
+        await self.send("Input.dispatchMouseEvent", {
+            "type": "mousePressed",
+            "x": x,
+            "y": y,
+            "button": button,
+            "clickCount": 1,
+        })
+        await asyncio.sleep(0.05 + 0.05 * __import__('random').random())
+        await self.send("Input.dispatchMouseEvent", {
+            "type": "mouseReleased",
+            "x": x,
+            "y": y,
+            "button": button,
+            "clickCount": 1,
+        })
+
+    async def scroll(self, x: float, y: float, delta_x: float = 0, delta_y: float = 0):
+        """Dispatch trusted scroll event via CDP Input domain."""
+        await self.send("Input.dispatchMouseEvent", {
+            "type": "mouseWheel",
+            "x": x,
+            "y": y,
+            "deltaX": delta_x,
+            "deltaY": delta_y,
+        })
+
+    async def key_press(self, key: str, text: str = ""):
+        """Dispatch trusted key press via CDP Input domain."""
+        await self.send("Input.dispatchKeyEvent", {
+            "type": "keyDown",
+            "key": key,
+            "text": text,
+        })
+        await asyncio.sleep(0.03 + 0.04 * __import__('random').random())
+        await self.send("Input.dispatchKeyEvent", {
+            "type": "keyUp",
+            "key": key,
+        })

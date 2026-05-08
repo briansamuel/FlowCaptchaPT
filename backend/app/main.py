@@ -9,6 +9,7 @@ from fastapi.staticfiles import StaticFiles
 
 from .config import settings
 from .database import init_db
+from .models import ProxySetting  # noqa: F401 — register model before create_all
 
 logging.basicConfig(
     level=logging.INFO,

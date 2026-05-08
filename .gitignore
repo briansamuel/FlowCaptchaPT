@@ -14,6 +14,9 @@ backend/chrome-profile-docker/
 # Test files
 backend/test_*.py
 test_*.py
+test_*.json
+test_*.txt
+t2v_*.py
 
 # Frontend build
 frontend-react/node_modules/

@@ -54,6 +54,24 @@ async def init_db():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await _migrate_usage_logs_nullable(conn)
+    await load_proxies_from_db()
+
+
+async def load_proxies_from_db():
+    from .config import proxy_pool, ProxyEntry
+    from .models import ProxySetting
+    from sqlalchemy import select
+    async with AsyncSessionLocal() as session:
+        result = await session.execute(select(ProxySetting).order_by(ProxySetting.position))
+        rows = result.scalars().all()
+        if rows:
+            entries = [
+                ProxyEntry(host=r.host, port=r.port, user=r.user or "", password=r.password or "", proxy_type=r.proxy_type or "socks5")
+                for r in rows
+            ]
+            proxy_pool.set_proxies(entries)
+            proxy_pool.enabled = any(r.enabled for r in rows)
+            logger.info(f"Loaded {len(entries)} proxies from DB (enabled={proxy_pool.enabled})")
 
 
 async def get_db():

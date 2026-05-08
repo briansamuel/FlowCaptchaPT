@@ -13,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
 from ..models import UsageLog
-from ..captcha.service import get_captcha_service
+from ..captcha.service import get_captcha_service, get_raw_captcha_service
 from ..captcha.queue import job_queue, JobStatus
 
 logger = logging.getLogger(__name__)
@@ -181,11 +181,13 @@ async def import_cookies(
     # Save cookies to profile via Playwright
     import sys
 
-    service = get_captcha_service()
+    service = get_raw_captcha_service()
     chrome_path = service._find_system_chrome()
 
     async def _inject():
         from playwright.async_api import async_playwright
+        service.kill_chrome()
+        import time; time.sleep(2)
         service._cleanup_locks()
         pw = await async_playwright().start()
         try:

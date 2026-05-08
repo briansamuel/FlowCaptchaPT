@@ -50,6 +50,7 @@ class CaptchaService:
         self.wait_delay: int = 15
         self._chrome_proc: Optional[subprocess.Popen] = None
         self._cdp_port: Optional[int] = None
+        self._cdp_port_override: Optional[int] = None  # For multi-profile port assignment
         # Tab pool: slot_index -> tab_id
         self._warm_tabs: dict = {}
         self._tab_queue: Optional[asyncio.Queue] = None
@@ -94,16 +95,14 @@ class CaptchaService:
                     pass
 
     def _is_chrome_alive(self) -> bool:
-        if not self._chrome_proc or self._chrome_proc.poll() is not None:
-            return False
-        if not self._cdp_port:
-            return False
+        port = self._cdp_port or self._cdp_port_override or 19284
         import socket
         try:
             s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             s.settimeout(1)
-            s.connect(("127.0.0.1", self._cdp_port))
+            s.connect(("127.0.0.1", port))
             s.close()
+            self._cdp_port = port
             return True
         except Exception:
             return False
@@ -118,8 +117,9 @@ class CaptchaService:
             if not chrome_path:
                 raise RuntimeError("Chrome not found. Install Google Chrome.")
 
-            self._cleanup_locks()
             self._kill_stale_chrome()
+            _time.sleep(2)
+            self._cleanup_locks()
             self._warm_tabs = {}
 
             port_file = Path(self.profile_dir) / "DevToolsActivePort"
@@ -129,7 +129,7 @@ class CaptchaService:
                 except Exception:
                     pass
 
-            cdp_port = 19222
+            cdp_port = self._cdp_port_override or 19284
 
             args = [
                 chrome_path,
@@ -137,68 +137,61 @@ class CaptchaService:
                 f"--remote-debugging-port={cdp_port}",
                 "--no-first-run",
                 "--no-default-browser-check",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
                 "--password-store=basic",
-                "--disable-gpu",
-                "--disable-software-rasterizer",
-                "--disable-dev-shm-usage",
-                "--disable-extensions",
-                "--disable-plugins",
-                "--disable-images",
-                "--blink-settings=imagesEnabled=false",
-                "--disable-default-apps",
                 "--disable-sync",
                 "--disable-translate",
-                "--disable-features=TranslateUI,MediaRouter,OptimizationHints,VizDisplayCompositor",
-                "--disable-component-update",
-                "--disable-background-networking",
-                "--disable-background-timer-throttling",
-                "--disable-backgrounding-occluded-windows",
-                "--disable-renderer-backgrounding",
-                "--disable-ipc-flooding-protection",
-                "--disable-hang-monitor",
-                "--no-pings",
-                "--metrics-recording-only",
+                "--disable-default-apps",
                 "--disable-crash-reporter",
                 "--disable-breakpad",
-                "--window-size=800,600",
-                "--window-position=9999,9999",
-                "--start-minimized",
+                "--window-size=1280,900",
             ]
+
+            if sys.platform != "win32":
+                args += ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"]
 
             if self.headless:
                 args.append("--headless=new")
 
+            from ..config import proxy_pool
+            p = proxy_pool.chrome_proxy_entry()
+            if p and not p.user:
+                args.append(f"--proxy-server={p.chrome_arg}")
+                logger.info(f"Chrome proxy: {p.chrome_arg}")
+            elif p and p.user:
+                logger.info(f"Chrome proxy skipped (SOCKS5 auth not supported by Chrome CLI)")
+
             args.append(TARGET_URL)
 
-            logger.info(f"Launching Chrome: headless={self.headless} port={cdp_port}")
+            logger.info(f"Launching Chrome: headless={self.headless} port={cdp_port} path={chrome_path}")
+            logger.debug(f"Chrome args: {' '.join(args[1:])}")
 
-            popen_kwargs = {
-                "stdout": subprocess.PIPE,
-                "stderr": subprocess.PIPE,
+            log_path = Path(self.profile_dir).parent / "chrome-stderr.log"
+            chrome_log = open(log_path, "w", encoding="utf-8", errors="replace")
+
+            popen_kw = {
+                "stdout": subprocess.DEVNULL,
+                "stderr": chrome_log,
             }
             if sys.platform == "win32":
-                startupinfo = subprocess.STARTUPINFO()
-                startupinfo.dwFlags = subprocess.STARTF_USESHOWWINDOW
-                startupinfo.wShowWindow = 7  # SW_SHOWMINNOACTIVE
-                popen_kwargs["startupinfo"] = startupinfo
+                popen_kw["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
 
-            self._chrome_proc = subprocess.Popen(args, **popen_kwargs)
+            self._chrome_proc = subprocess.Popen(args, **popen_kw)
+            self._chrome_log_fp = chrome_log
 
             import socket
             deadline = _time.time() + 15
             while _time.time() < deadline:
                 if self._chrome_proc.poll() is not None:
                     exit_code = self._chrome_proc.returncode
-                    stderr_out = ""
                     try:
-                        stderr_out = self._chrome_proc.stderr.read().decode(errors="replace")[:2000]
+                        chrome_log.close()
+                        with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                            stderr_tail = f.read()[-3000:]
                     except Exception:
-                        pass
+                        stderr_tail = ""
                     logger.error(f"Chrome exited with code {exit_code}")
-                    if stderr_out:
-                        logger.error(f"Chrome stderr: {stderr_out}")
+                    if stderr_tail.strip():
+                        logger.error(f"Chrome stderr: {stderr_tail}")
                     self._chrome_proc = None
                     raise RuntimeError(f"Chrome crashed (exit code {exit_code})")
                 try:
@@ -218,39 +211,59 @@ class CaptchaService:
             raise RuntimeError(f"Chrome failed to start (port {cdp_port} timeout)")
 
     def _kill_stale_chrome(self):
+        """Kill Chrome process owned by this service (by PID if available, else by port)."""
         import subprocess as sp
-        profile_name = Path(self.profile_dir).name
+        # If we have a known process, kill it directly
+        if self._chrome_proc and self._chrome_proc.poll() is None:
+            try:
+                self._chrome_proc.kill()
+                self._chrome_proc.wait(timeout=5)
+                logger.info(f"Killed own Chrome process (pid={self._chrome_proc.pid})")
+            except Exception:
+                pass
+            self._chrome_proc = None
+            _time.sleep(1)
+            return
+
+        # Fallback: kill by port (only if no other instances running)
+        port = self._cdp_port_override or self._cdp_port or 19284
         try:
             if sys.platform == "win32":
+                # Find PID listening on our specific port
                 result = sp.run(
-                    ["wmic", "process", "where",
-                     f"commandline like '%{profile_name}%' and name='chrome.exe'",
-                     "get", "processid"],
-                    capture_output=True, text=True, timeout=5
+                    ["netstat", "-ano"],
+                    capture_output=True, text=True, timeout=10,
                 )
-                for line in result.stdout.strip().split("\n"):
-                    line = line.strip()
-                    if line.isdigit():
-                        try:
-                            sp.run(["taskkill", "/PID", line, "/F"], capture_output=True, timeout=5)
-                            logger.info(f"Killed stale Chrome PID {line}")
-                        except Exception:
-                            pass
+                for line in result.stdout.splitlines():
+                    if f":{port}" in line and "LISTENING" in line:
+                        parts = line.split()
+                        pid = parts[-1]
+                        sp.run(["taskkill", "/PID", pid, "/F"], capture_output=True, timeout=5)
+                        logger.info(f"Killed Chrome on port {port} (pid={pid})")
+                        _time.sleep(1)
+                        break
             else:
+                # Linux: kill process using our port
                 result = sp.run(
-                    ["pgrep", "-f", f"--user-data-dir=.*{profile_name}"],
-                    capture_output=True, text=True, timeout=5
+                    ["fuser", f"{port}/tcp"],
+                    capture_output=True, text=True, timeout=5,
                 )
-                for line in result.stdout.strip().split("\n"):
-                    line = line.strip()
-                    if line.isdigit():
-                        try:
-                            sp.run(["kill", "-9", line], capture_output=True, timeout=5)
-                            logger.info(f"Killed stale Chrome PID {line}")
-                        except Exception:
-                            pass
+                if result.stdout.strip():
+                    pids = result.stdout.strip().split()
+                    for pid in pids:
+                        sp.run(["kill", "-9", pid], capture_output=True, timeout=5)
+                    logger.info(f"Killed Chrome on port {port} (pids={pids})")
+                    _time.sleep(1)
         except Exception:
-            pass
+            # Last resort for first launch: kill all chrome
+            try:
+                if sys.platform == "win32":
+                    sp.run(["taskkill", "/IM", "chrome.exe", "/F"], capture_output=True, timeout=10)
+                else:
+                    sp.run(["pkill", "-9", "-f", "chrome"], capture_output=True, timeout=5)
+                _time.sleep(2)
+            except Exception:
+                pass
 
     async def _setup_warm_tab(self, cdp, slot: int = 0):
         """Create a new tab on labs.google and inject reCAPTCHA script."""
@@ -349,10 +362,37 @@ class CaptchaService:
             if page is None:
                 page = await self._setup_warm_tab(cdp, slot)
 
-            effective_delay = min(wait_delay, 3) if tab_reused else wait_delay
+            effective_delay = min(wait_delay, 5) if tab_reused else wait_delay
             if effective_delay > 0:
                 logger.info(f"Slot {slot}: waiting {effective_delay}s...")
                 await asyncio.sleep(effective_delay)
+
+            # Simulate human-like behavior before minting
+            import random
+            try:
+                simulate_js = """
+                    (async () => {
+                        // Mouse movements
+                        for (let i = 0; i < 3 + Math.floor(Math.random()*3); i++) {
+                            const x = 100 + Math.floor(Math.random()*800);
+                            const y = 100 + Math.floor(Math.random()*500);
+                            window.dispatchEvent(new MouseEvent('mousemove', {clientX: x, clientY: y, bubbles: true}));
+                            await new Promise(r => setTimeout(r, 200 + Math.random()*400));
+                        }
+                        // Scroll
+                        window.scrollBy(0, 50 + Math.floor(Math.random()*200));
+                        await new Promise(r => setTimeout(r, 300 + Math.random()*500));
+                        window.scrollBy(0, -(30 + Math.floor(Math.random()*100)));
+                        await new Promise(r => setTimeout(r, 200 + Math.random()*300));
+                        // Focus/blur
+                        window.dispatchEvent(new Event('focus'));
+                        await new Promise(r => setTimeout(r, 500 + Math.random()*1000));
+                        return 'done';
+                    })()
+                """
+                await page.evaluate(simulate_js, timeout=15)
+            except Exception:
+                pass
 
             # Token script with built-in grecaptcha wait (handles page reload race)
             token_script = f"""
@@ -489,7 +529,16 @@ class CaptchaService:
 _instance: Optional[CaptchaService] = None
 
 
-def get_captcha_service() -> CaptchaService:
+def get_captcha_service() -> "ProfileManager":
+    """Get the ProfileManager (replaces direct CaptchaService access).
+    Returns ProfileManager which has the same get_token()/open_for_login() interface.
+    """
+    from .profile_manager import get_profile_manager
+    return get_profile_manager()
+
+
+def get_raw_captcha_service() -> CaptchaService:
+    """Get a raw single CaptchaService (for backward compat / cookie import)."""
     global _instance
     if _instance is None:
         from ..config import settings

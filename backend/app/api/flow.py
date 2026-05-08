@@ -5,19 +5,72 @@ import json
 import logging
 import time
 import uuid
-from typing import Optional, List
+from typing import Optional, List, Dict
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+try:
+    from aiohttp_socks import ProxyConnector
+except ImportError:
+    ProxyConnector = None
+
 from ..captcha.service import get_captcha_service
 from ..captcha.queue import job_queue, JobStatus
+from ..config import proxy_pool
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/flow", tags=["flow"])
 
 FLOW_API_BASE = "https://aisandbox-pa.googleapis.com/v1"
+SESSION_REFRESH_URL = "https://labs.google/fx/api/auth/session"
+
+
+# ---------------------------------------------------------------------------
+# Token store: projectId -> {accessToken, cookies, expiresAt}
+# ---------------------------------------------------------------------------
+
+class TokenSession:
+    def __init__(self, access_token: str, cookies: str, expires_at: float = 0):
+        self.access_token = access_token
+        self.cookies = cookies
+        self.expires_at = expires_at
+
+_token_store: Dict[str, TokenSession] = {}
+
+
+async def _refresh_access_token(project_id: str) -> Optional[str]:
+    session_data = _token_store.get(project_id)
+    if not session_data or not session_data.cookies:
+        return None
+
+    tag = f"[{project_id[:8]}]"
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(
+                SESSION_REFRESH_URL,
+                headers={
+                    "Cookie": session_data.cookies,
+                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+                },
+                timeout=aiohttp.ClientTimeout(total=30),
+            ) as resp:
+                if resp.status != 200:
+                    logger.warning(f"{tag} Token refresh failed: HTTP {resp.status}")
+                    return None
+                data = await resp.json()
+                new_token = data.get("access_token")
+                if not new_token:
+                    logger.warning(f"{tag} Token refresh: no access_token in response")
+                    return None
+                expires_str = data.get("expires", "")
+                session_data.access_token = new_token
+                logger.info(f"{tag} Token refreshed OK, expires={expires_str}")
+                return new_token
+    except Exception as e:
+        logger.error(f"{tag} Token refresh error: {e}")
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +151,55 @@ class VideoStatusRequest(BaseModel):
     operations: List[VideoStatusOperation]
 
 
+class SessionRegisterRequest(BaseModel):
+    projectId: str
+    accessToken: str
+    cookies: str
+
+
+# ---------------------------------------------------------------------------
+# Session management endpoints
+# ---------------------------------------------------------------------------
+
+@router.post("/sessions/register")
+async def register_session(req: SessionRegisterRequest):
+    """Register session cookies for auto token refresh."""
+    _token_store[req.projectId] = TokenSession(
+        access_token=req.accessToken,
+        cookies=req.cookies,
+    )
+    logger.info(f"[{req.projectId[:8]}] Session registered")
+    return {"success": True, "projectId": req.projectId}
+
+
+@router.get("/sessions/list")
+async def list_sessions():
+    """List registered sessions (no secrets)."""
+    return {
+        "sessions": [
+            {"projectId": pid, "hasToken": bool(s.access_token), "hasCookies": bool(s.cookies)}
+            for pid, s in _token_store.items()
+        ]
+    }
+
+
+@router.delete("/sessions/{project_id}")
+async def delete_session(project_id: str):
+    """Remove a registered session."""
+    if project_id in _token_store:
+        del _token_store[project_id]
+    return {"success": True}
+
+
+@router.post("/sessions/refresh/{project_id}")
+async def manual_refresh(project_id: str):
+    """Manually trigger token refresh for a project."""
+    new_token = await _refresh_access_token(project_id)
+    if not new_token:
+        raise HTTPException(400, "Token refresh failed - check cookies")
+    return {"success": True, "accessToken": new_token}
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -145,6 +247,15 @@ def _client_context(
     if paygate_tier:
         ctx["userPaygateTier"] = paygate_tier
     return ctx
+
+
+def _resolve_token(access_token: str, project_id: str = "") -> str:
+    """Use stored token if available and request token is empty/placeholder."""
+    if project_id and project_id in _token_store:
+        stored = _token_store[project_id]
+        if stored.access_token:
+            return stored.access_token
+    return access_token
 
 
 def _headers(access_token: str) -> dict:
@@ -230,13 +341,22 @@ async def _flow_request(
     project_id: str = "",
 ) -> dict:
     tag = f"[{project_id[:8]}]" if project_id else ""
-    async with aiohttp.ClientSession() as session:
+    current_token = access_token
+    token_refreshed = False
+
+    connector = None
+    proxy_entry = proxy_pool.next()
+    if proxy_entry and ProxyConnector:
+        connector = ProxyConnector.from_url(proxy_entry.url)
+        logger.debug(f"{tag} Using proxy: {proxy_entry.host}:{proxy_entry.port}")
+
+    async with aiohttp.ClientSession(connector=connector) as session:
         for attempt in range(1, FLOW_MAX_RETRIES + 1):
             try:
                 async with session.request(
                     method,
                     url,
-                    headers=_headers(access_token),
+                    headers=_headers(current_token),
                     json=body,
                     timeout=aiohttp.ClientTimeout(total=timeout_s),
                 ) as resp:
@@ -244,6 +364,17 @@ async def _flow_request(
                         return await resp.json()
                     text = await resp.text()
                     reason, vi_msg, is_retryable = _parse_flow_error(text, resp.status)
+
+                    if resp.status == 401 and not token_refreshed and project_id:
+                        logger.info(f"{tag} Token expired, attempting auto-refresh...")
+                        new_token = await _refresh_access_token(project_id)
+                        if new_token:
+                            current_token = new_token
+                            token_refreshed = True
+                            logger.info(f"{tag} Token refreshed, retrying request...")
+                            continue
+                        logger.warning(f"{tag} Token refresh failed, no cookies registered")
+
                     if reason == "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC":
                         logger.warning(f"{tag} Flow API [{reason}]: {vi_msg}. Delay 20s...")
                         await asyncio.sleep(20)
@@ -278,9 +409,13 @@ async def _upload_reference_image(
     file_name: Optional[str] = None,
 ) -> str:
     if not file_name:
-        file_name = f"upload_{uuid.uuid4().hex[:8]}.jpg"
+        file_name = f"upload_{uuid.uuid4().hex[:12]}.jpg"
     body = {
-        "clientContext": {"projectId": project_id, "tool": "PINHOLE"},
+        "clientContext": {
+            "projectId": project_id,
+            "tool": "PINHOLE",
+            "sessionId": f";{int(time.time() * 1000)}",
+        },
         "fileName": file_name,
         "imageBytes": image_b64,
         "isHidden": False,
@@ -333,6 +468,7 @@ async def _upload_user_image(
 @router.post("/images/generate")
 async def generate_image(req: ImageGenerateRequest):
     """Generate image (T2I). Include referenceImages or referenceImageBase64 for I2I."""
+    token = _resolve_token(req.accessToken, req.projectId)
     image_inputs: list = []
     upload_tasks: list = []
 
@@ -340,14 +476,14 @@ async def generate_image(req: ImageGenerateRequest):
         for ref in req.referenceImages:
             upload_tasks.append(
                 _upload_reference_image(
-                    req.accessToken, req.projectId,
+                    token, req.projectId,
                     ref.base64, ref.mimeType, ref.fileName,
                 )
             )
     elif req.referenceImageBase64:
         upload_tasks.append(
             _upload_reference_image(
-                req.accessToken, req.projectId,
+                token, req.projectId,
                 req.referenceImageBase64, req.referenceImageMimeType,
                 req.referenceImageFileName,
             )
@@ -383,7 +519,7 @@ async def generate_image(req: ImageGenerateRequest):
     result = await _flow_request(
         "POST",
         f"{FLOW_API_BASE}/projects/{req.projectId}/flowMedia:batchGenerateImages",
-        req.accessToken,
+        token,
         body,
         project_id=req.projectId,
     )
@@ -409,28 +545,50 @@ async def generate_image(req: ImageGenerateRequest):
     }
 
 
+UPSCALE_MAX_RETRIES = 5
+UPSCALE_RETRY_DELAY = 8
+
+
 @router.post("/images/upscale")
 async def upscale_image(req: ImageUpscaleRequest):
-    """Upscale image to 2K/4K. Returns base64 JPEG."""
-    recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    """Upscale image to 2K/4K. Returns base64 JPEG. Retries on UNUSUAL_ACTIVITY with fresh captcha."""
+    token = _resolve_token(req.accessToken, req.projectId)
+    tag = f"[{req.projectId[:8]}]"
 
-    body = {
-        "mediaId": req.mediaId,
-        "targetResolution": req.targetResolution,
-        "clientContext": ctx,
-    }
+    last_err: Optional[HTTPException] = None
+    for attempt in range(1, UPSCALE_MAX_RETRIES + 1):
+        recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
+        ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+        body = {
+            "mediaId": req.mediaId,
+            "targetResolution": req.targetResolution,
+            "clientContext": ctx,
+        }
+        try:
+            result = await _flow_request(
+                "POST",
+                f"{FLOW_API_BASE}/flow/upsampleImage",
+                token,
+                body,
+                timeout_s=300,
+                project_id=req.projectId,
+            )
+            if attempt > 1:
+                logger.info(f"{tag} Upscale OK after {attempt} attempts")
+            return {"success": True, "encodedImage": result.get("encodedImage")}
+        except HTTPException as e:
+            last_err = e
+            detail = str(e.detail) if e.detail else ""
+            is_unusual = "bất thường" in detail or e.status_code in (403, 429, 503)
+            if is_unusual and attempt < UPSCALE_MAX_RETRIES:
+                logger.warning(f"{tag} Upscale attempt {attempt}/{UPSCALE_MAX_RETRIES} failed: {detail}. Retry sau {UPSCALE_RETRY_DELAY}s với captcha mới...")
+                await asyncio.sleep(UPSCALE_RETRY_DELAY)
+                continue
+            raise
 
-    result = await _flow_request(
-        "POST",
-        f"{FLOW_API_BASE}/flow/upsampleImage",
-        req.accessToken,
-        body,
-        timeout_s=300,
-        project_id=req.projectId,
-    )
-
-    return {"success": True, "encodedImage": result.get("encodedImage")}
+    if last_err:
+        raise last_err
+    raise HTTPException(503, "Upscale failed after all retries")
 
 
 # ---------------------------------------------------------------------------
@@ -445,6 +603,7 @@ async def generate_video(req: VideoGenerateRequest):
     - I2V-FL: startImageBase64 + endImageBase64 (first-last frame)
     - R2V: referenceImages (1-3 images, separate endpoint + V2 payload)
     """
+    token = _resolve_token(req.accessToken, req.projectId)
     is_r2v = bool(req.referenceImages)
 
     # --- Upload images ---
@@ -457,21 +616,21 @@ async def generate_video(req: VideoGenerateRequest):
         for ref in req.referenceImages:
             upload_tasks.append(
                 _upload_user_image(
-                    req.accessToken, ref.base64, ref.aspectRatio, ref.mimeType,
+                    token, ref.base64, ref.aspectRatio, ref.mimeType,
                 )
             )
     else:
         if req.startImageBase64:
             upload_tasks.append(
                 _upload_user_image(
-                    req.accessToken, req.startImageBase64,
+                    token, req.startImageBase64,
                     req.startImageAspectRatio, req.startImageMimeType,
                 )
             )
         if req.endImageBase64:
             upload_tasks.append(
                 _upload_user_image(
-                    req.accessToken, req.endImageBase64,
+                    token, req.endImageBase64,
                     req.endImageAspectRatio, req.endImageMimeType,
                 )
             )
@@ -540,7 +699,7 @@ async def generate_video(req: VideoGenerateRequest):
             "requests": [req_item],
         }
 
-    result = await _flow_request("POST", endpoint, req.accessToken, body, project_id=req.projectId)
+    result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
 
     operations = []
     for op in result.get("operations", []):
@@ -560,6 +719,7 @@ async def generate_video(req: VideoGenerateRequest):
 @router.post("/videos/upscale")
 async def upscale_video(req: VideoUpscaleRequest):
     """Upscale video to 1080p/4K. Returns operation for polling."""
+    token = _resolve_token(req.accessToken, req.projectId)
     recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
     ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
@@ -582,7 +742,7 @@ async def upscale_video(req: VideoUpscaleRequest):
     result = await _flow_request(
         "POST",
         f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoUpsampleVideo",
-        req.accessToken,
+        token,
         body,
         project_id=req.projectId,
     )

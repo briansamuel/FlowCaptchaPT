@@ -42,3 +42,16 @@ class UsageLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     api_key = relationship("ApiKey", back_populates="logs")
+
+
+class ProxySetting(Base):
+    __tablename__ = "proxy_settings"
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    host = Column(String(255), nullable=False)
+    port = Column(Integer, nullable=False)
+    user = Column(String(255), default="")
+    password = Column(String(255), default="")
+    proxy_type = Column(String(20), default="socks5")
+    enabled = Column(Boolean, default=True)
+    position = Column(Integer, default=0)

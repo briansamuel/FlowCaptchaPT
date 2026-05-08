@@ -143,7 +143,10 @@ class CaptchaService:
                 "--disable-default-apps",
                 "--disable-crash-reporter",
                 "--disable-breakpad",
+                "--disable-background-networking",
+                "--disable-client-side-phishing-detection",
                 "--window-size=1280,900",
+                "about:blank",
             ]
 
             if sys.platform != "win32":
@@ -159,8 +162,6 @@ class CaptchaService:
                 logger.info(f"Chrome proxy: {p.chrome_arg}")
             elif p and p.user:
                 logger.info(f"Chrome proxy skipped (SOCKS5 auth not supported by Chrome CLI)")
-
-            args.append(TARGET_URL)
 
             logger.info(f"Launching Chrome: headless={self.headless} port={cdp_port} path={chrome_path}")
             logger.debug(f"Chrome args: {' '.join(args[1:])}")

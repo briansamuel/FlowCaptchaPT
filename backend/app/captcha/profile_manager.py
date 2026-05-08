@@ -57,7 +57,6 @@ class ProfileManager:
 
         # Ephemeral state
         self._ephemeral_semaphore: Optional[asyncio.Semaphore] = None
-        self._ephemeral_port_pool: Optional[asyncio.Queue] = None
 
         self._init_strategy()
 
@@ -97,15 +96,17 @@ class ProfileManager:
         )
 
     def _init_ephemeral(self):
-        """Ephemeral profiles - fresh temp dir per request."""
-        # Limit concurrent ephemeral instances
+        """Ephemeral mode - single Chrome instance, fresh browser context per request.
+        Each request gets an isolated context (like incognito) - no cookies/cache shared.
+        """
         max_ephemeral = min(self.max_concurrent, 4)
         self._ephemeral_semaphore = asyncio.Semaphore(max_ephemeral)
-        # Port pool for ephemeral instances
-        self._ephemeral_port_pool = asyncio.Queue()
-        for i in range(max_ephemeral):
-            self._ephemeral_port_pool.put_nowait(BASE_CDP_PORT + i)
-        logger.info(f"Profile strategy: EPHEMERAL (max {max_ephemeral} concurrent)")
+        # Single shared Chrome instance for ephemeral mode
+        profile_dir = self.base_profile_dir.parent / "chrome-profile-ephemeral"
+        profile_dir.mkdir(parents=True, exist_ok=True)
+        svc = self._create_service(str(profile_dir), BASE_CDP_PORT)
+        self._services = [svc]
+        logger.info(f"Profile strategy: EPHEMERAL (max {max_ephemeral} concurrent, single Chrome)")
 
     def _create_service(self, profile_dir: str, cdp_port: int) -> CaptchaService:
         """Create a CaptchaService with a specific profile and port."""
@@ -137,45 +138,137 @@ class ProfileManager:
         return await svc.get_token(action)
 
     async def _get_token_ephemeral(self, action: str) -> CaptchaResult:
-        """Create fresh profile, get token, destroy profile."""
+        """Use shared Chrome but create isolated browser context per request.
+        Each context is like a fresh incognito window - no cookies/cache persist.
+        """
+        from .cdp_client import RawCDPClient
+
         async with self._ephemeral_semaphore:
-            # Get a port from the pool
-            try:
-                port = await asyncio.wait_for(self._ephemeral_port_pool.get(), timeout=60)
-            except asyncio.TimeoutError:
-                return CaptchaResult(action=action, error="No ephemeral port available")
-
-            # Create temp profile directory
-            temp_dir = tempfile.mkdtemp(prefix="captcha_ephemeral_")
-            svc = None
+            svc = self._services[0]
+            cdp = None
+            browser_context_id = None
 
             try:
-                svc = CaptchaService(profile_dir=temp_dir, headless=self._headless)
-                svc._cdp_port_override = port
-                svc.set_concurrency(1)  # One tab per ephemeral instance
-                svc.cooldown = 0  # No cooldown for ephemeral (profile is disposable)
-                svc.cooldown_fail = 0
-                svc.wait_delay = self._wait_delay
+                # Ensure Chrome is running
+                import asyncio
+                loop = asyncio.get_running_loop()
+                from .service import _executor
+                port = await loop.run_in_executor(_executor, svc.ensure_chrome)
 
-                logger.debug(f"Ephemeral: created temp profile {temp_dir}, port {port}")
-                result = await svc.get_token(action)
-                return result
+                cdp = RawCDPClient(port)
+                await cdp.connect()
+
+                # Create isolated browser context (like incognito - no shared cookies)
+                ctx_result = await cdp.send("Target.createBrowserContext", {
+                    "disposeOnDetach": True,
+                })
+                browser_context_id = ctx_result.get("result", {}).get("browserContextId")
+
+                if not browser_context_id:
+                    return CaptchaResult(action=action, error="Failed to create browser context")
+
+                # Create tab in the isolated context
+                from .service import TARGET_URL, SITE_KEY, RECAPTCHA_SCRIPT_URL
+                tab_result = await cdp.send("Target.createTarget", {
+                    "url": TARGET_URL,
+                    "browserContextId": browser_context_id,
+                })
+                target_id = tab_result.get("result", {}).get("targetId")
+                if not target_id:
+                    return CaptchaResult(action=action, error="Failed to create ephemeral tab")
+
+                page = await cdp.attach_to_target(target_id)
+
+                # Wait for page load
+                for _ in range(30):
+                    try:
+                        state = await page.evaluate("document.readyState")
+                        if state in ("complete", "interactive"):
+                            break
+                    except Exception:
+                        pass
+                    await asyncio.sleep(1)
+
+                await asyncio.sleep(2)
+
+                # Bootstrap reCAPTCHA (single evaluate)
+                bootstrap_js = f"""
+                    (async () => {{
+                        if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
+                            && typeof grecaptcha.enterprise.execute === 'function') {{
+                            return 'ready';
+                        }}
+                        const existing = document.querySelector('script[src*="recaptcha/enterprise"]');
+                        if (!existing) {{
+                            const s = document.createElement('script');
+                            s.src = '{RECAPTCHA_SCRIPT_URL}';
+                            document.head.appendChild(s);
+                        }}
+                        for (let i = 0; i < 40; i++) {{
+                            if (typeof grecaptcha !== 'undefined' && grecaptcha.enterprise
+                                && typeof grecaptcha.enterprise.execute === 'function') {{
+                                return 'ready';
+                            }}
+                            await new Promise(r => setTimeout(r, 500));
+                        }}
+                        return 'timeout';
+                    }})()
+                """
+                ready = await page.evaluate(bootstrap_js, timeout=25)
+                if ready == 'timeout':
+                    return CaptchaResult(action=action, error="grecaptcha not ready in ephemeral context")
+
+                # Human simulation with trusted CDP input
+                await svc._simulate_human_input(page)
+
+                # Observation window
+                import random
+                await asyncio.sleep(random.uniform(5, 10))
+                await svc._simulate_human_input(page)
+                await asyncio.sleep(random.uniform(2, 4))
+
+                # Mint token (single evaluate)
+                token_script = f"""
+                    (async () => {{
+                        try {{
+                            const token = await grecaptcha.enterprise.execute(
+                                '{SITE_KEY}', {{ action: '{action}' }}
+                            );
+                            if (!token) return JSON.stringify({{ success: false, error: 'empty token' }});
+                            return JSON.stringify({{ success: true, token: token }});
+                        }} catch (e) {{
+                            return JSON.stringify({{ success: false, error: e.message }});
+                        }}
+                    }})()
+                """
+                import json
+                raw = await page.evaluate(token_script, timeout=45)
+                token_result = json.loads(raw) if isinstance(raw, str) else raw
+
+                if token_result.get("success") and token_result.get("token"):
+                    logger.info(f"Ephemeral: got {action} token")
+                    return CaptchaResult(token=token_result["token"], action=action)
+
+                return CaptchaResult(action=action, error=token_result.get("error", "unknown"))
 
             except Exception as e:
                 logger.error(f"Ephemeral request failed: {e}")
                 return CaptchaResult(action=action, error=str(e))
 
             finally:
-                # Always cleanup: kill Chrome and delete temp profile
-                if svc:
-                    svc.kill_chrome()
-                try:
-                    shutil.rmtree(temp_dir, ignore_errors=True)
-                    logger.debug(f"Ephemeral: cleaned up {temp_dir}")
-                except Exception:
-                    pass
-                # Return port to pool
-                self._ephemeral_port_pool.put_nowait(port)
+                # Cleanup: dispose the browser context (closes all its tabs)
+                if cdp and browser_context_id:
+                    try:
+                        await cdp.send("Target.disposeBrowserContext", {
+                            "browserContextId": browser_context_id,
+                        })
+                    except Exception:
+                        pass
+                if cdp:
+                    try:
+                        await cdp.close()
+                    except Exception:
+                        pass
 
     async def open_for_login(self) -> str:
         """Open Chrome for manual login (uses first rotation profile or base profile)."""

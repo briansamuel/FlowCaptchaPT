@@ -261,8 +261,16 @@ def _resolve_token(access_token: str, project_id: str = "") -> str:
 def _headers(access_token: str) -> dict:
     return {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
-        "X-Goog-AuthUser": "0",
+        "Content-Type": "text/plain;charset=UTF-8",
+        "Origin": "https://labs.google",
+        "Referer": "https://labs.google/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36 Edg/137.0.0.0",
+        "sec-ch-ua": '"Microsoft Edge";v="137", "Chromium";v="137", "Not/A)Brand";v="24"',
+        "sec-ch-ua-mobile": "?0",
+        "sec-ch-ua-platform": '"Windows"',
+        "sec-fetch-dest": "empty",
+        "sec-fetch-mode": "cors",
+        "sec-fetch-site": "cross-site",
     }
 
 
@@ -350,8 +358,25 @@ async def _flow_request(
         connector = ProxyConnector.from_url(proxy_entry.url)
         logger.debug(f"{tag} Using proxy: {proxy_entry.host}:{proxy_entry.port}")
 
+    # Extract recaptcha token preview for correlation (first 30 chars)
+    rcap_preview = ""
+    session_id = ""
+    batch_id = ""
+    if body:
+        try:
+            ctx = body.get("clientContext") or (body.get("requests", [{}])[0].get("clientContext") if body.get("requests") else {})
+            rcap = ctx.get("recaptchaContext", {}).get("token", "")
+            rcap_preview = rcap[:30] if rcap else "<no-token>"
+            session_id = ctx.get("sessionId", "")
+            batch_id = body.get("mediaGenerationContext", {}).get("batchId", "")
+        except Exception:
+            pass
+
+    endpoint_short = url.split("/v1/")[-1][:60] if "/v1/" in url else url[-60:]
+
     async with aiohttp.ClientSession(connector=connector) as session:
         for attempt in range(1, FLOW_MAX_RETRIES + 1):
+            req_start = time.time()
             try:
                 async with session.request(
                     method,
@@ -360,10 +385,26 @@ async def _flow_request(
                     json=body,
                     timeout=aiohttp.ClientTimeout(total=timeout_s),
                 ) as resp:
+                    elapsed_ms = int((time.time() - req_start) * 1000)
+                    # Capture key Google response headers
+                    google_headers = {
+                        k: v for k, v in resp.headers.items()
+                        if k.lower().startswith(("x-google", "x-goog", "x-debug", "alt-svc", "server", "via"))
+                    }
                     if resp.status == 200:
+                        logger.info(
+                            f"{tag} ✅ {endpoint_short} {resp.status} {elapsed_ms}ms | "
+                            f"sid={session_id} batch={batch_id[:8]} rcap={rcap_preview}..."
+                        )
                         return await resp.json()
                     text = await resp.text()
                     reason, vi_msg, is_retryable = _parse_flow_error(text, resp.status)
+                    logger.error(
+                        f"{tag} ❌ {endpoint_short} {resp.status} [{reason}] {elapsed_ms}ms | "
+                        f"sid={session_id} batch={batch_id[:8]} rcap={rcap_preview}... | "
+                        f"google_headers={google_headers} | "
+                        f"body_preview={text[:400]}"
+                    )
 
                     if resp.status == 401 and not token_refreshed and project_id:
                         logger.info(f"{tag} Token expired, attempting auto-refresh...")
@@ -386,7 +427,6 @@ async def _flow_request(
                         )
                         await asyncio.sleep(FLOW_RETRY_DELAY)
                         continue
-                    logger.error(f"{tag} Flow API {resp.status} [{reason}]: {vi_msg}")
                     raise HTTPException(resp.status, vi_msg)
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
                 if attempt < FLOW_MAX_RETRIES:
@@ -549,6 +589,93 @@ UPSCALE_MAX_RETRIES = 5
 UPSCALE_RETRY_DELAY = 8
 
 
+@router.post("/images/generate-v2")
+async def generate_image_v2(req: ImageGenerateRequest):
+    """Generate image V2 — matches current web UI payload.
+
+    Default imageModel changed to NARWHAL (vs GEM_PIX_2 in V1).
+    Same payload structure as V1 (already matches).
+    """
+    token = _resolve_token(req.accessToken, req.projectId)
+    image_inputs: list = []
+    upload_tasks: list = []
+
+    if req.referenceImages:
+        for ref in req.referenceImages:
+            upload_tasks.append(
+                _upload_reference_image(
+                    token, req.projectId,
+                    ref.base64, ref.mimeType, ref.fileName,
+                )
+            )
+    elif req.referenceImageBase64:
+        upload_tasks.append(
+            _upload_reference_image(
+                token, req.projectId,
+                req.referenceImageBase64, req.referenceImageMimeType,
+                req.referenceImageFileName,
+            )
+        )
+
+    if upload_tasks:
+        ref_ids = await asyncio.gather(*upload_tasks)
+        for ref_id in ref_ids:
+            image_inputs.append({
+                "imageInputType": "IMAGE_INPUT_TYPE_REFERENCE",
+                "name": ref_id,
+            })
+
+    recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
+    ctx = _client_context(req.projectId, recaptcha)
+    seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
+    batch_id = str(uuid.uuid4())
+
+    # V2 default model: NARWHAL (web UI default). Allow override via req.imageModel.
+    image_model = req.imageModel if req.imageModel and req.imageModel != "GEM_PIX_2" else "NARWHAL"
+
+    body = {
+        "clientContext": ctx,
+        "mediaGenerationContext": {"batchId": batch_id},
+        "requests": [{
+            "clientContext": ctx,
+            "imageAspectRatio": req.aspectRatio,
+            "imageInputs": image_inputs,
+            "imageModelName": image_model,
+            "seed": seed,
+            "structuredPrompt": {"parts": [{"text": req.promptText}]},
+        }],
+        "useNewMedia": True,
+    }
+
+    result = await _flow_request(
+        "POST",
+        f"{FLOW_API_BASE}/projects/{req.projectId}/flowMedia:batchGenerateImages",
+        token,
+        body,
+        project_id=req.projectId,
+    )
+
+    media_out = []
+    for m in result.get("media", []):
+        gen = m.get("image", {}).get("generatedImage", {})
+        media_out.append({
+            "mediaName": m.get("name"),
+            "mediaId": gen.get("mediaId"),
+            "fifeUrl": gen.get("fifeUrl"),
+            "seed": gen.get("seed"),
+            "prompt": gen.get("prompt"),
+            "aspectRatio": gen.get("aspectRatio"),
+            "dimensions": m.get("image", {}).get("dimensions"),
+        })
+
+    return {
+        "success": True,
+        "batchId": batch_id,
+        "media": media_out,
+        "remainingCredits": result.get("remainingCredits"),
+    }
+
+
 @router.post("/images/upscale")
 async def upscale_image(req: ImageUpscaleRequest):
     """Upscale image to 2K/4K. Returns base64 JPEG. Retries on UNUSUAL_ACTIVITY with fresh captcha."""
@@ -698,6 +825,112 @@ async def generate_video(req: VideoGenerateRequest):
             "clientContext": ctx,
             "requests": [req_item],
         }
+
+    result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
+
+    operations = []
+    for op in result.get("operations", []):
+        operations.append({
+            "operationName": op.get("operation", {}).get("name"),
+            "sceneId": op.get("sceneId"),
+        })
+
+    return {
+        "success": True,
+        "batchId": batch_id,
+        "operations": operations,
+        "remainingCredits": result.get("remainingCredits"),
+    }
+
+
+@router.post("/videos/generate-v2")
+async def generate_video_v2(req: VideoGenerateRequest):
+    """Generate video with V2 payload schema (matches current web UI).
+
+    Differences from /videos/generate:
+    - Uses `structuredPrompt: {parts: [{text}]}` instead of `prompt`
+    - Adds `mediaGenerationContext.audioFailurePreference = "BLOCK_SILENCED_VIDEOS"`
+    - Adds top-level `useV2ModelConfig: true` for all modes
+    - Modes supported: T2V, I2V, I2V-FL, R2V
+    """
+    token = _resolve_token(req.accessToken, req.projectId)
+    is_r2v = bool(req.referenceImages)
+
+    # --- Upload images ---
+    upload_tasks: list = []
+    start_media_id: Optional[str] = None
+    end_media_id: Optional[str] = None
+    ref_media_ids: list = []
+
+    if is_r2v:
+        for ref in req.referenceImages:
+            upload_tasks.append(
+                _upload_user_image(token, ref.base64, ref.aspectRatio, ref.mimeType)
+            )
+    else:
+        if req.startImageBase64:
+            upload_tasks.append(
+                _upload_user_image(token, req.startImageBase64, req.startImageAspectRatio, req.startImageMimeType)
+            )
+        if req.endImageBase64:
+            upload_tasks.append(
+                _upload_user_image(token, req.endImageBase64, req.endImageAspectRatio, req.endImageMimeType)
+            )
+
+    if upload_tasks:
+        uploaded = await asyncio.gather(*upload_tasks)
+        if is_r2v:
+            ref_media_ids = list(uploaded)
+        else:
+            idx = 0
+            if req.startImageBase64:
+                start_media_id = uploaded[idx]
+                idx += 1
+            if req.endImageBase64:
+                end_media_id = uploaded[idx]
+
+    recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
+    ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
+    batch_id = str(uuid.uuid4())
+
+    # V2 request item — always uses structuredPrompt
+    req_item: dict = {
+        "aspectRatio": req.aspectRatio,
+        "metadata": {},
+        "seed": seed,
+        "textInput": {
+            "structuredPrompt": {"parts": [{"text": req.promptText}]},
+        },
+        "videoModelKey": req.videoModelKey,
+    }
+
+    if is_r2v:
+        req_item["referenceImages"] = [
+            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+            for mid in ref_media_ids
+        ]
+        req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoReferenceImages"
+    elif start_media_id and end_media_id:
+        req_item["startImage"] = {"mediaId": start_media_id}
+        req_item["endImage"] = {"mediaId": end_media_id}
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartAndEndImage"
+    elif start_media_id:
+        req_item["startImage"] = {"mediaId": start_media_id}
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartImage"
+    else:
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoText"
+
+    body = {
+        "clientContext": ctx,
+        "mediaGenerationContext": {
+            "batchId": batch_id,
+            "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
+        },
+        "requests": [req_item],
+        "useV2ModelConfig": True,
+    }
 
     result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
 

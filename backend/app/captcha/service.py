@@ -323,66 +323,8 @@ class CaptchaService:
         if result == 'timeout':
             raise RuntimeError("grecaptcha not ready after 20s")
 
-        # Perform initial trusted input to build reCAPTCHA observation history
-        await self._simulate_human_input(page)
-
         logger.info(f"Tab slot {slot} ready (tab={target_id[:12]})")
         return page
-
-    async def _simulate_human_input(self, page):
-        """Simulate human behavior using CDP Input domain (trusted events, isTrusted=true)."""
-        import random
-
-        try:
-            # Realistic mouse movement with bezier-like trajectory
-            # Start from a random position
-            cx, cy = random.randint(200, 600), random.randint(150, 400)
-            await page.mouse_move(cx, cy)
-            await asyncio.sleep(random.uniform(0.3, 0.8))
-
-            # Move mouse in organic pattern (5-8 movements)
-            for _ in range(random.randint(5, 8)):
-                # Small incremental moves (humans don't teleport)
-                dx = random.randint(-120, 120)
-                dy = random.randint(-80, 80)
-                cx = max(50, min(1200, cx + dx))
-                cy = max(50, min(800, cy + dy))
-                await page.mouse_move(cx, cy)
-                await asyncio.sleep(random.uniform(0.05, 0.25))
-
-            # Pause (human reading/thinking)
-            await asyncio.sleep(random.uniform(0.5, 1.5))
-
-            # Scroll down naturally
-            scroll_x = random.randint(400, 800)
-            scroll_y = random.randint(300, 500)
-            await page.scroll(scroll_x, scroll_y, delta_y=random.randint(80, 200))
-            await asyncio.sleep(random.uniform(0.4, 1.0))
-
-            # More mouse movement
-            for _ in range(random.randint(2, 4)):
-                cx += random.randint(-80, 80)
-                cy += random.randint(-60, 60)
-                cx = max(50, min(1200, cx))
-                cy = max(50, min(800, cy))
-                await page.mouse_move(cx, cy)
-                await asyncio.sleep(random.uniform(0.08, 0.2))
-
-            # Scroll up a bit
-            await page.scroll(scroll_x, scroll_y, delta_y=random.randint(-100, -30))
-            await asyncio.sleep(random.uniform(0.3, 0.7))
-
-            # Optional: click somewhere neutral (body area)
-            if random.random() > 0.5:
-                await page.mouse_click(
-                    random.randint(300, 900),
-                    random.randint(200, 600)
-                )
-                await asyncio.sleep(random.uniform(0.2, 0.5))
-
-        except Exception as e:
-            # Non-critical — don't fail if input simulation has issues
-            logger.debug(f"Human simulation partial: {e}")
 
     async def _extract_via_cdp(self, action: str, wait_delay: int = 0, slot: int = 0) -> CaptchaResult:
         """Runs on main event loop. Each slot is independent.
@@ -433,28 +375,11 @@ class CaptchaService:
             if page is None:
                 page = await self._setup_warm_tab(cdp, slot)
 
-            # Observation window: let reCAPTCHA collect behavioral signals
-            # For reused tabs, shorter delay (already has history)
-            # For fresh tabs, longer delay (needs to build trust)
-            import random
-            if tab_reused:
-                obs_delay = random.uniform(2, 5)
-            else:
-                obs_delay = random.uniform(8, 15)
-
-            # Add configured wait_delay on top
-            total_delay = obs_delay + min(wait_delay, 10)
-            logger.info(f"Slot {slot}: observation window {total_delay:.1f}s (reused={tab_reused})")
-
-            # During observation, perform trusted human input
-            await self._simulate_human_input(page)
-            remaining = total_delay - 3  # ~3s spent on simulation
-            if remaining > 0:
-                # Idle period (human reading/thinking)
-                await asyncio.sleep(remaining * 0.6)
-                # One more burst of activity before mint
-                await self._simulate_human_input(page)
-                await asyncio.sleep(remaining * 0.4)
+            # Simple wait before mint
+            effective_delay = min(wait_delay, 5) if tab_reused else min(wait_delay, 10)
+            if effective_delay > 0:
+                logger.info(f"Slot {slot}: waiting {effective_delay}s (reused={tab_reused})")
+                await asyncio.sleep(effective_delay)
 
             # --- Token mint: single evaluate call ---
             token_script = f"""
@@ -494,7 +419,8 @@ class CaptchaService:
 
                 if token_result.get("success") and token_result.get("token"):
                     result.token = token_result["token"]
-                    logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1})")
+                    tok_preview = result.token[:30]
+                    logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1}, tab_reused={tab_reused}, preview={tok_preview}...)")
                     return result
 
                 error = token_result.get("error", "empty token")

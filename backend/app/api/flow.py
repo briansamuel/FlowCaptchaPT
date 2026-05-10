@@ -204,12 +204,16 @@ async def manual_refresh(project_id: str):
 # Helpers
 # ---------------------------------------------------------------------------
 
+CAPTCHA_MINT_TIMEOUT = 45
+CAPTCHA_QUEUE_TIMEOUT = 60
+
+
 async def _mint_recaptcha(action: str) -> str:
     service = get_captcha_service()
     try:
-        result = await asyncio.wait_for(service.get_token(action), timeout=120)
+        result = await asyncio.wait_for(service.get_token(action), timeout=CAPTCHA_MINT_TIMEOUT)
     except asyncio.TimeoutError:
-        raise HTTPException(503, "reCAPTCHA mint timeout (120s)")
+        raise HTTPException(503, f"reCAPTCHA mint timeout ({CAPTCHA_MINT_TIMEOUT}s)")
 
     if result.token:
         return result.token
@@ -217,7 +221,7 @@ async def _mint_recaptcha(action: str) -> str:
     if result.error and "Cooldown" in result.error:
         job = job_queue.submit(action, None, None)
         asyncio.ensure_future(job_queue.run_worker(job, service))
-        deadline = time.time() + 120
+        deadline = time.time() + CAPTCHA_QUEUE_TIMEOUT
         while time.time() < deadline:
             j = job_queue.get(job.id)
             if j and j.status == JobStatus.COMPLETED:

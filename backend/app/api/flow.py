@@ -588,7 +588,7 @@ async def generate_image(req: ImageGenerateRequest):
     }
 
 
-UPSCALE_MAX_RETRIES = 5
+UPSCALE_MAX_RETRIES = 3
 UPSCALE_RETRY_DELAY = 8
 
 

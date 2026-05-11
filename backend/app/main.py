@@ -26,7 +26,22 @@ async def lifespan(app: FastAPI):
     logger.info(f"Chrome profile: {settings.chrome_profile_path}")
     logger.info(f"Headless: {settings.headless}")
     logger.info(f"Max concurrent: {settings.max_concurrent}")
+
+    # Start clear data scheduler
+    from .captcha.clear_data import start_clear_data_scheduler, stop_clear_data_scheduler
+    from .captcha.service import get_raw_captcha_service
+
+    def _get_cdp_port():
+        svc = get_raw_captcha_service()
+        return svc._cdp_port
+
+    if settings.clear_data_interval > 0:
+        start_clear_data_scheduler(settings.clear_data_interval, _get_cdp_port)
+        logger.info(f"Clear data scheduler: every {settings.clear_data_interval} minutes")
+
     yield
+
+    stop_clear_data_scheduler()
     from .captcha.service import get_captcha_service
     svc = get_captcha_service()
     await svc.close()

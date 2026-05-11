@@ -112,3 +112,21 @@ async def get_profile_info():
     """Get current profile strategy info."""
     svc = get_captcha_service()
     return svc.profile_info
+
+
+@router.post("/clear-data")
+async def trigger_clear_data():
+    """Manually trigger clear browsing data."""
+    from ..captcha.clear_data import clear_browsing_data
+    from ..captcha.service import get_raw_captcha_service
+
+    svc = get_raw_captcha_service()
+    port = svc._cdp_port
+    if not port:
+        return {"status": "error", "message": "Chrome not running"}
+
+    try:
+        await clear_browsing_data(port)
+        return {"status": "ok", "message": "Browsing data cleared"}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}

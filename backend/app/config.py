@@ -96,6 +96,9 @@ class Settings(BaseSettings):
     default_wait_delay: int = 10
     headless: bool = False
 
+    # Clear browsing data interval (minutes, 0 = disabled)
+    clear_data_interval: int = 5
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

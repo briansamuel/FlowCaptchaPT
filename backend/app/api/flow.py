@@ -421,8 +421,7 @@ async def _flow_request(
                         logger.warning(f"{tag} Token refresh failed, no cookies registered")
 
                     if reason == "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC":
-                        logger.warning(f"{tag} Flow API [{reason}]: {vi_msg}. Delay 20s...")
-                        await asyncio.sleep(20)
+                        logger.warning(f"{tag} Flow API rate-limited [{reason}]: {vi_msg} (no retry, no delay — fail fast)")
                         raise HTTPException(resp.status, vi_msg)
                     if is_retryable and attempt < FLOW_MAX_RETRIES:
                         logger.warning(
@@ -710,8 +709,14 @@ async def upscale_image(req: ImageUpscaleRequest):
         except HTTPException as e:
             last_err = e
             detail = str(e.detail) if e.detail else ""
-            is_unusual = "bất thường" in detail or e.status_code in (403, 429, 503)
-            if is_unusual and attempt < UPSCALE_MAX_RETRIES:
+            # Don't retry on rate-limit (429 TOO_MUCH_TRAFFIC) — that just spams Google
+            is_rate_limited = e.status_code == 429 or "Quá nhiều request" in detail
+            if is_rate_limited:
+                logger.warning(f"{tag} Upscale rate-limited (429), failing fast (no retry to avoid spam)")
+                raise
+            # Retry only on score-based failures (UNUSUAL_ACTIVITY 403) or transient 503
+            is_retryable = "bất thường" in detail or e.status_code == 503
+            if is_retryable and attempt < UPSCALE_MAX_RETRIES:
                 logger.warning(f"{tag} Upscale attempt {attempt}/{UPSCALE_MAX_RETRIES} failed: {detail}. Retry sau {UPSCALE_RETRY_DELAY}s với captcha mới...")
                 await asyncio.sleep(UPSCALE_RETRY_DELAY)
                 continue

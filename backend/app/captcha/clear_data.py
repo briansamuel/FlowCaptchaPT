@@ -161,6 +161,7 @@ async def clear_browsing_data_cdp(port: int) -> bool:
     reused_tab = False
     try:
         await cdp.connect()
+        logger.info(f"[ClearData] ➤ Step 1: Connected to Chrome CDP (port={port})")
 
         # Try to find an existing about:blank tab to reuse (avoids focus steal)
         import aiohttp
@@ -179,11 +180,14 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         # If no blank tab found, create one (background - no focus steal)
         if not tab_id:
             tab_id = await cdp.create_tab("about:blank", background=True)
+            logger.info(f"[ClearData] ➤ Step 2: Created background tab")
+        else:
+            logger.info(f"[ClearData] ➤ Step 2: Reusing existing blank tab")
 
         # Attach and navigate to settings
         page = await cdp.attach_to_target(tab_id)
         await page.navigate("chrome://settings/privacy")
-        logger.info(f"[ClearData] Navigated to chrome://settings/privacy (port={port})")
+        logger.info(f"[ClearData] ➤ Step 3: Navigated to chrome://settings/privacy")
 
         # Wait for page to load
         await asyncio.sleep(3)
@@ -193,6 +197,7 @@ async def clear_browsing_data_cdp(port: int) -> bool:
 
         # Wait for settings page to fully render
         await asyncio.sleep(2)
+        logger.info(f"[ClearData] ➤ Step 4: Settings page loaded, executing clear script...")
 
         # Script to click "Delete browsing data" link, select "All time", then click "Delete data"
         clear_script = """
@@ -264,39 +269,38 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         """
 
         result = await page.evaluate(clear_script, timeout=30)
-        logger.info(f"[ClearData] Settings page result: {result}")
+        logger.info(f"[ClearData] ➤ Step 5: Script result: {result}")
 
         if result and 'success' in str(result):
-            logger.info(f"[ClearData] ✓ Cleared via chrome://settings/clearBrowserData (port={port})")
+            logger.info(f"[ClearData] ✓ SUCCESS - Browsing data deleted via Chrome Settings UI (port={port})")
             # Wait for Chrome to finish clearing
             await asyncio.sleep(2)
         else:
-            logger.warning(f"[ClearData] Settings page clear may have failed: {result}")
+            logger.warning(f"[ClearData] ✗ Settings page clear failed: {result}")
             # Fallback: try Network commands
             try:
                 await page.send("Network.enable")
                 await page.send("Network.clearBrowserCache")
                 await page.send("Network.clearBrowserCookies")
-                logger.info(f"[ClearData] ✓ Fallback CDP Network clear done (port={port})")
+                logger.info(f"[ClearData] ✓ Fallback: CDP Network clear done (port={port})")
             except Exception:
                 pass
 
         return True
     except Exception as e:
-        logger.warning(f"[ClearData] CDP clear failed (port={port}): {e}")
+        logger.warning(f"[ClearData] ✗ CDP clear failed (port={port}): {e}")
         return False
     finally:
-        # Close or reset the tab (navigate back to about:blank if reused)
+        # Close or reset the tab
         if tab_id and cdp:
             try:
                 if reused_tab:
-                    # Navigate back to about:blank instead of closing
                     page = await cdp.attach_to_target(tab_id)
                     await page.send("Page.navigate", {"url": "about:blank"})
-                    logger.info(f"[ClearData] ✓ Reset tab to about:blank")
+                    logger.info(f"[ClearData] ➤ Step 6: Tab reset to about:blank")
                 else:
                     await cdp.close_tab(tab_id)
-                    logger.info(f"[ClearData] ✓ Closed settings tab")
+                    logger.info(f"[ClearData] ➤ Step 6: Settings tab closed")
             except Exception:
                 pass
         try:

@@ -291,6 +291,7 @@ ERROR_MESSAGES_VI = {
     "PUBLIC_ERROR_UNSAFE_GENERATION": "Nội dung không an toàn - vi phạm chính sách",
     "PUBLIC_ERROR_VIOLENCE": "Nội dung chứa bạo lực",
     "PUBLIC_ERROR_IP_INPUT_IMAGE": "Ảnh vi phạm bản quyền sở hữu trí tuệ (IP)",
+    "PUBLIC_ERROR_IMAGE_OUTPUT_IP_FILTER": "Ảnh đầu ra vi phạm bản quyền sở hữu trí tuệ (IP)",
     "PUBLIC_ERROR_MINOR_UPLOAD": "Ảnh chứa trẻ vị thành niên - không cho phép upload",
     "PUBLIC_ERROR_CHILD_SAFETY": "Vi phạm chính sách bảo vệ trẻ em",
     "PUBLIC_ERROR_DECEPTIVE": "Nội dung lừa đảo hoặc gây hiểu lầm",

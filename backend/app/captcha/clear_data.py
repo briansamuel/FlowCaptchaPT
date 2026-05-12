@@ -161,9 +161,9 @@ async def clear_browsing_data_cdp(port: int) -> bool:
     try:
         await cdp.connect()
 
-        # Open chrome://settings/clearBrowserData
-        tab_id = await cdp.create_tab("chrome://settings/clearBrowserData")
-        logger.info(f"[ClearData] Opened chrome://settings/clearBrowserData (port={port})")
+        # Open chrome://settings/privacy (we need to click the "Delete browsing data" link)
+        tab_id = await cdp.create_tab("chrome://settings/privacy")
+        logger.info(f"[ClearData] Opened chrome://settings/privacy (port={port})")
 
         # Wait for page to load
         await asyncio.sleep(3)
@@ -174,13 +174,12 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         # Wait for settings page to fully render
         await asyncio.sleep(2)
 
-        # Script to select "All time" and click "Clear data" button via shadow DOM
+        # Script to click "Delete browsing data" link, select "All time", then click "Delete data"
         clear_script = """
         (async () => {
-            // Helper to wait
             const sleep = ms => new Promise(r => setTimeout(r, ms));
             
-            // Navigate through shadow DOM to find the clear browsing data dialog
+            // Navigate through shadow DOM to find the privacy page
             const settingsUi = document.querySelector('settings-ui');
             if (!settingsUi || !settingsUi.shadowRoot) return 'error: no settings-ui';
             
@@ -193,34 +192,47 @@ async def clear_browsing_data_cdp(port: int) -> bool:
             const privacyPage = basicPage.shadowRoot.querySelector('settings-privacy-page');
             if (!privacyPage || !privacyPage.shadowRoot) return 'error: no settings-privacy-page';
             
-            const dialog = privacyPage.shadowRoot.querySelector('settings-clear-browsing-data-dialog');
-            if (!dialog || !dialog.shadowRoot) return 'error: no clear-browsing-data-dialog';
+            const privacyRoot = privacyPage.shadowRoot;
+            
+            // Step 1: Click "Delete browsing data" link to open the dialog
+            const clearLink = privacyRoot.querySelector('#clearBrowsingData');
+            if (!clearLink) return 'error: no #clearBrowsingData link';
+            clearLink.click();
+            
+            // Wait for dialog to appear
+            await sleep(2000);
+            
+            // Step 2: Find the dialog (it appears after clicking)
+            const dialog = privacyRoot.querySelector('settings-clear-browsing-data-dialog');
+            if (!dialog || !dialog.shadowRoot) return 'error: no clear-browsing-data-dialog after click';
             
             const dialogRoot = dialog.shadowRoot;
             
-            // Select "All time" in the time range dropdown (value=4)
-            const dropdown = dialogRoot.querySelector('#clearFromBasic') || 
-                           dialogRoot.querySelector('[id*="clearFrom"]');
+            // Step 3: Select "All time" in the time range dropdown (value=4)
+            const dropdown = dialogRoot.querySelector('#clearFromBasic');
             if (dropdown) {
-                // Try to set to "All time" (value 4)
-                const select = dropdown.shadowRoot ? 
-                    dropdown.shadowRoot.querySelector('select') : 
-                    dropdown.querySelector('select');
-                if (select) {
-                    select.value = '4';
-                    select.dispatchEvent(new Event('change', {bubbles: true}));
+                const selectEl = dropdown.shadowRoot ? 
+                    dropdown.shadowRoot.querySelector('select') : null;
+                if (selectEl) {
+                    selectEl.value = '4';
+                    selectEl.dispatchEvent(new Event('change', {bubbles: true}));
+                    await sleep(500);
+                } else {
+                    // Try iron-dropdown or md-select approach
+                    dropdown.value = '4';
+                    dropdown.dispatchEvent(new Event('change', {bubbles: true}));
                     await sleep(500);
                 }
             }
             
-            // Find and click the "Clear data" / "Delete data" button
+            // Step 4: Click "Delete data" / "Clear data" button
             const clearBtn = dialogRoot.querySelector('#clearBrowsingDataConfirm');
             if (!clearBtn) return 'error: no clearBrowsingDataConfirm button';
             
             clearBtn.click();
             await sleep(3000);
             
-            return 'success: clicked clear data button';
+            return 'success: clicked Delete data button';
         })()
         """
 

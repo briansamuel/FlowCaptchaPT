@@ -158,12 +158,32 @@ async def clear_browsing_data_cdp(port: int) -> bool:
 
     cdp = RawCDPClient(port)
     tab_id = None
+    reused_tab = False
     try:
         await cdp.connect()
 
-        # Open chrome://settings/privacy (we need to click the "Delete browsing data" link)
-        tab_id = await cdp.create_tab("chrome://settings/privacy")
-        logger.info(f"[ClearData] Opened chrome://settings/privacy (port={port})")
+        # Try to find an existing about:blank tab to reuse (avoids focus steal)
+        import aiohttp
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(f"http://127.0.0.1:{port}/json") as resp:
+                    targets = await resp.json()
+                    for t in targets:
+                        if t.get("type") == "page" and t.get("url", "") in ("about:blank", "chrome://newtab/"):
+                            tab_id = t["id"]
+                            reused_tab = True
+                            break
+        except Exception:
+            pass
+
+        # If no blank tab found, create one (background)
+        if not tab_id:
+            tab_id = await cdp.create_tab("about:blank")
+
+        # Attach and navigate to settings
+        page = await cdp.attach_to_target(tab_id)
+        await page.navigate("chrome://settings/privacy")
+        logger.info(f"[ClearData] Navigated to chrome://settings/privacy (port={port})")
 
         # Wait for page to load
         await asyncio.sleep(3)
@@ -266,11 +286,17 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         logger.warning(f"[ClearData] CDP clear failed (port={port}): {e}")
         return False
     finally:
-        # Always close the settings tab
+        # Close or reset the tab (navigate back to about:blank if reused)
         if tab_id and cdp:
             try:
-                await cdp.close_tab(tab_id)
-                logger.info(f"[ClearData] ✓ Closed settings tab")
+                if reused_tab:
+                    # Navigate back to about:blank instead of closing
+                    page = await cdp.attach_to_target(tab_id)
+                    await page.send("Page.navigate", {"url": "about:blank"})
+                    logger.info(f"[ClearData] ✓ Reset tab to about:blank")
+                else:
+                    await cdp.close_tab(tab_id)
+                    logger.info(f"[ClearData] ✓ Closed settings tab")
             except Exception:
                 pass
         try:

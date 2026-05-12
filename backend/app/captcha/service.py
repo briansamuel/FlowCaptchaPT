@@ -145,6 +145,8 @@ class CaptchaService:
                 "--disable-breakpad",
                 "--disable-background-networking",
                 "--disable-client-side-phishing-detection",
+                "--disable-focus-stealing-fix",
+                "--no-focus-on-navigate",
                 "--window-size=1280,900",
                 "about:blank",
             ]

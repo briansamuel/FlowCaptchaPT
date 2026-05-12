@@ -142,8 +142,8 @@ def _clear_cache_dirs(profile_dir: str):
 
 
 async def clear_browsing_data_cdp(port: int) -> bool:
-    """Clear cache and cookies via CDP commands on a page session.
-    Network.* commands require a page target, not browser-level WS.
+    """Clear browsing data by opening chrome://settings/clearBrowserData and clicking 'Delete data'.
+    This is the same as manually clearing from Chrome's UI - most thorough method.
     Returns True if successful, False if Chrome not reachable.
     """
     # First check if Chrome is actually listening on this port
@@ -157,47 +157,103 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         return False
 
     cdp = RawCDPClient(port)
+    tab_id = None
     try:
         await cdp.connect()
 
-        # Create a temporary tab to run Network commands on
-        tab_id = await cdp.create_tab("about:blank")
+        # Open chrome://settings/clearBrowserData
+        tab_id = await cdp.create_tab("chrome://settings/clearBrowserData")
+        logger.info(f"[ClearData] Opened chrome://settings/clearBrowserData (port={port})")
+
+        # Wait for page to load
+        await asyncio.sleep(3)
+
+        # Attach to the tab
         page = await cdp.attach_to_target(tab_id)
 
-        # Enable Network domain on this page session
-        await page.send("Network.enable")
+        # Wait for settings page to fully render
+        await asyncio.sleep(2)
 
-        # Clear browser cache via page session
-        result = await page.send("Network.clearBrowserCache")
-        if "error" not in result:
-            logger.info(f"[ClearData] ✓ CDP: Browser cache cleared (port={port})")
+        # Script to select "All time" and click "Clear data" button via shadow DOM
+        clear_script = """
+        (async () => {
+            // Helper to wait
+            const sleep = ms => new Promise(r => setTimeout(r, ms));
+            
+            // Navigate through shadow DOM to find the clear browsing data dialog
+            const settingsUi = document.querySelector('settings-ui');
+            if (!settingsUi || !settingsUi.shadowRoot) return 'error: no settings-ui';
+            
+            const settingsMain = settingsUi.shadowRoot.querySelector('settings-main');
+            if (!settingsMain || !settingsMain.shadowRoot) return 'error: no settings-main';
+            
+            const basicPage = settingsMain.shadowRoot.querySelector('settings-basic-page');
+            if (!basicPage || !basicPage.shadowRoot) return 'error: no settings-basic-page';
+            
+            const privacyPage = basicPage.shadowRoot.querySelector('settings-privacy-page');
+            if (!privacyPage || !privacyPage.shadowRoot) return 'error: no settings-privacy-page';
+            
+            const dialog = privacyPage.shadowRoot.querySelector('settings-clear-browsing-data-dialog');
+            if (!dialog || !dialog.shadowRoot) return 'error: no clear-browsing-data-dialog';
+            
+            const dialogRoot = dialog.shadowRoot;
+            
+            // Select "All time" in the time range dropdown (value=4)
+            const dropdown = dialogRoot.querySelector('#clearFromBasic') || 
+                           dialogRoot.querySelector('[id*="clearFrom"]');
+            if (dropdown) {
+                // Try to set to "All time" (value 4)
+                const select = dropdown.shadowRoot ? 
+                    dropdown.shadowRoot.querySelector('select') : 
+                    dropdown.querySelector('select');
+                if (select) {
+                    select.value = '4';
+                    select.dispatchEvent(new Event('change', {bubbles: true}));
+                    await sleep(500);
+                }
+            }
+            
+            // Find and click the "Clear data" / "Delete data" button
+            const clearBtn = dialogRoot.querySelector('#clearBrowsingDataConfirm');
+            if (!clearBtn) return 'error: no clearBrowsingDataConfirm button';
+            
+            clearBtn.click();
+            await sleep(3000);
+            
+            return 'success: clicked clear data button';
+        })()
+        """
+
+        result = await page.evaluate(clear_script, timeout=30)
+        logger.info(f"[ClearData] Settings page result: {result}")
+
+        if result and 'success' in str(result):
+            logger.info(f"[ClearData] ✓ Cleared via chrome://settings/clearBrowserData (port={port})")
+            # Wait for Chrome to finish clearing
+            await asyncio.sleep(2)
         else:
-            logger.warning(f"[ClearData] CDP clearBrowserCache error: {result.get('error')}")
-
-        # Clear browser cookies via page session
-        result = await page.send("Network.clearBrowserCookies")
-        if "error" not in result:
-            logger.info(f"[ClearData] ✓ CDP: Browser cookies cleared (port={port})")
-        else:
-            logger.warning(f"[ClearData] CDP clearBrowserCookies error: {result.get('error')}")
-
-        # Also clear via Storage domain for thorough cleanup
-        try:
-            await page.send("Storage.clearCookies", {"browserContextId": ""})
-        except Exception:
-            pass
-
-        # Close the temp tab
-        try:
-            await cdp.close_tab(tab_id)
-        except Exception:
-            pass
+            logger.warning(f"[ClearData] Settings page clear may have failed: {result}")
+            # Fallback: try Network commands
+            try:
+                await page.send("Network.enable")
+                await page.send("Network.clearBrowserCache")
+                await page.send("Network.clearBrowserCookies")
+                logger.info(f"[ClearData] ✓ Fallback CDP Network clear done (port={port})")
+            except Exception:
+                pass
 
         return True
     except Exception as e:
         logger.warning(f"[ClearData] CDP clear failed (port={port}): {e}")
         return False
     finally:
+        # Always close the settings tab
+        if tab_id and cdp:
+            try:
+                await cdp.close_tab(tab_id)
+                logger.info(f"[ClearData] ✓ Closed settings tab")
+            except Exception:
+                pass
         try:
             await cdp.close()
         except Exception:

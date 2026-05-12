@@ -24,79 +24,126 @@ _clear_task: Optional[asyncio.Task] = None
 
 
 def _clear_history_files(profile_dir: str):
-    """Clear browsing history and download history by wiping Chrome SQLite files."""
+    """Clear browsing history, download history, and cookies from Chrome SQLite files."""
     profile = Path(profile_dir)
 
-    # Chrome stores history in "Default/History" or directly in profile root
-    # depending on how the profile was set up
-    history_locations = [
-        profile / "Default" / "History",
-        profile / "History",
-    ]
+    # Chrome stores data in "Default/" subfolder or directly in profile root
+    search_roots = [profile / "Default", profile]
 
-    for history_file in history_locations:
+    for root in search_roots:
+        if not root.exists():
+            continue
+
+        # --- Browsing history + Download history ---
+        history_file = root / "History"
         if history_file.exists():
             try:
                 conn = sqlite3.connect(str(history_file))
                 cursor = conn.cursor()
-                # Clear browsing history
                 cursor.execute("DELETE FROM urls")
                 cursor.execute("DELETE FROM visits")
-                cursor.execute("DELETE FROM visit_source")
-                # Clear download history
+                try:
+                    cursor.execute("DELETE FROM visit_source")
+                except sqlite3.OperationalError:
+                    pass
                 try:
                     cursor.execute("DELETE FROM downloads")
                     cursor.execute("DELETE FROM downloads_url_chains")
                 except sqlite3.OperationalError:
-                    pass  # Table might not exist
+                    pass
                 conn.commit()
                 conn.close()
                 logger.info(f"[ClearData] ✓ Cleared history DB: {history_file}")
             except Exception as e:
                 logger.warning(f"[ClearData] Could not clear {history_file}: {e}")
-                # Fallback: try to delete the file entirely
+
+        # --- Cookies ---
+        cookies_file = root / "Cookies"
+        if cookies_file.exists():
+            try:
+                conn = sqlite3.connect(str(cookies_file))
+                cursor = conn.cursor()
+                cursor.execute("DELETE FROM cookies")
+                conn.commit()
+                conn.close()
+                logger.info(f"[ClearData] ✓ Cleared cookies DB: {cookies_file}")
+            except Exception as e:
+                logger.warning(f"[ClearData] Could not clear {cookies_file}: {e}")
+
+        # --- Web Data (autofill, etc) ---
+        webdata_file = root / "Web Data"
+        if webdata_file.exists():
+            try:
+                conn = sqlite3.connect(str(webdata_file))
+                cursor = conn.cursor()
                 try:
-                    history_file.unlink()
-                    logger.info(f"[ClearData] ✓ Deleted history file: {history_file}")
+                    cursor.execute("DELETE FROM autofill")
+                except sqlite3.OperationalError:
+                    pass
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass
+
+        # --- Clean journal files ---
+        for fname in ["History-journal", "Cookies-journal", "Web Data-journal"]:
+            journal = root / fname
+            if journal.exists():
+                try:
+                    journal.unlink()
                 except Exception:
                     pass
 
-    # Also clear the journal files
-    for loc in history_locations:
-        journal = Path(str(loc) + "-journal")
-        if journal.exists():
-            try:
-                journal.unlink()
-            except Exception:
-                pass
+        # --- Session/Tab data ---
+        for fname in ["Current Session", "Current Tabs", "Last Session", "Last Tabs",
+                      "Visited Links", "Network Action Predictor"]:
+            f = root / fname
+            if f.exists():
+                try:
+                    f.unlink()
+                    logger.info(f"[ClearData] ✓ Deleted: {f.name}")
+                except Exception:
+                    pass
 
 
 def _clear_cache_dirs(profile_dir: str):
     """Clear cached images and files by removing Cache directories."""
     profile = Path(profile_dir)
 
+    # All possible cache locations (both Default/ and root)
     cache_dirs = [
         profile / "Default" / "Cache",
         profile / "Default" / "Code Cache",
         profile / "Default" / "GPUCache",
+        profile / "Default" / "Service Worker" / "CacheStorage",
+        profile / "Default" / "Service Worker" / "ScriptCache",
+        profile / "Default" / "IndexedDB",
+        profile / "Default" / "File System",
+        profile / "Default" / "blob_storage",
         profile / "Cache",
         profile / "Code Cache",
         profile / "GPUCache",
         profile / "ShaderCache",
+        profile / "GrShaderCache",
     ]
 
+    cleared = 0
     for cache_dir in cache_dirs:
         if cache_dir.exists() and cache_dir.is_dir():
             try:
                 shutil.rmtree(str(cache_dir), ignore_errors=True)
                 cache_dir.mkdir(parents=True, exist_ok=True)
-                logger.info(f"[ClearData] ✓ Cleared cache dir: {cache_dir}")
+                cleared += 1
             except Exception as e:
                 logger.warning(f"[ClearData] Could not clear cache {cache_dir}: {e}")
 
+    if cleared > 0:
+        logger.info(f"[ClearData] ✓ Cleared {cleared} cache directories")
+
 
 async def clear_browsing_data_cdp(port: int) -> bool:
-    """Clear cache and cookies via CDP commands (most reliable method).
+    """Clear cache and cookies via CDP commands on a page session.
+    Network.* commands require a page target, not browser-level WS.
     Returns True if successful, False if Chrome not reachable.
     """
     # First check if Chrome is actually listening on this port
@@ -113,19 +160,38 @@ async def clear_browsing_data_cdp(port: int) -> bool:
     try:
         await cdp.connect()
 
-        # Clear browser cache
-        result = await cdp.send("Network.clearBrowserCache")
+        # Create a temporary tab to run Network commands on
+        tab_id = await cdp.create_tab("about:blank")
+        page = await cdp.attach_to_target(tab_id)
+
+        # Enable Network domain on this page session
+        await page.send("Network.enable")
+
+        # Clear browser cache via page session
+        result = await page.send("Network.clearBrowserCache")
         if "error" not in result:
             logger.info(f"[ClearData] ✓ CDP: Browser cache cleared (port={port})")
         else:
             logger.warning(f"[ClearData] CDP clearBrowserCache error: {result.get('error')}")
 
-        # Clear browser cookies
-        result = await cdp.send("Network.clearBrowserCookies")
+        # Clear browser cookies via page session
+        result = await page.send("Network.clearBrowserCookies")
         if "error" not in result:
             logger.info(f"[ClearData] ✓ CDP: Browser cookies cleared (port={port})")
         else:
             logger.warning(f"[ClearData] CDP clearBrowserCookies error: {result.get('error')}")
+
+        # Also clear via Storage domain for thorough cleanup
+        try:
+            await page.send("Storage.clearCookies", {"browserContextId": ""})
+        except Exception:
+            pass
+
+        # Close the temp tab
+        try:
+            await cdp.close_tab(tab_id)
+        except Exception:
+            pass
 
         return True
     except Exception as e:

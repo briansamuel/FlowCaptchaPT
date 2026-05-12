@@ -356,6 +356,17 @@ async def _flow_request(
     current_token = access_token
     token_refreshed = False
 
+    # Log outgoing payload summary (model name, num imageInputs)
+    if body and "batchGenerateImages" in url:
+        try:
+            req_item = body.get("requests", [{}])[0]
+            model = req_item.get("imageModelName", "?")
+            inputs_count = len(req_item.get("imageInputs", []))
+            aspect = req_item.get("imageAspectRatio", "?")
+            logger.info(f"{tag} → batchGenerateImages payload: model={model} inputs={inputs_count} aspect={aspect}")
+        except Exception:
+            pass
+
     connector = None
     proxy_entry = proxy_pool.next()
     if proxy_entry and ProxyConnector:

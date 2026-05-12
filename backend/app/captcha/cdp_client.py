@@ -24,6 +24,7 @@ class RawCDPClient:
         self.port = port
         self._msg_id = 0
         self._ws = None
+        self._session = None
         self._pending = {}
         self._events = asyncio.Queue()
         self._reader_task = None

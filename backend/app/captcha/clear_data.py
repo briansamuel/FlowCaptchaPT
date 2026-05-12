@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import socket
 import sqlite3
 import shutil
 from pathlib import Path
@@ -94,8 +95,20 @@ def _clear_cache_dirs(profile_dir: str):
                 logger.warning(f"[ClearData] Could not clear cache {cache_dir}: {e}")
 
 
-async def clear_browsing_data_cdp(port: int):
-    """Clear cache and cookies via CDP commands (most reliable method)."""
+async def clear_browsing_data_cdp(port: int) -> bool:
+    """Clear cache and cookies via CDP commands (most reliable method).
+    Returns True if successful, False if Chrome not reachable.
+    """
+    # First check if Chrome is actually listening on this port
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.settimeout(2)
+        s.connect(("127.0.0.1", port))
+        s.close()
+    except (ConnectionRefusedError, OSError, socket.timeout):
+        logger.info(f"[ClearData] Chrome not running on port {port}, skipping CDP clear")
+        return False
+
     cdp = RawCDPClient(port)
     try:
         await cdp.connect()
@@ -114,10 +127,15 @@ async def clear_browsing_data_cdp(port: int):
         else:
             logger.warning(f"[ClearData] CDP clearBrowserCookies error: {result.get('error')}")
 
+        return True
     except Exception as e:
-        logger.error(f"[ClearData] CDP clear failed (port={port}): {e}")
+        logger.warning(f"[ClearData] CDP clear failed (port={port}): {e}")
+        return False
     finally:
-        await cdp.close()
+        try:
+            await cdp.close()
+        except Exception:
+            pass
 
 
 async def clear_all_data(profile_dirs: List[str], cdp_ports: List[int]):

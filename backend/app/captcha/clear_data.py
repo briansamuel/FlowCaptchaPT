@@ -202,34 +202,41 @@ async def clear_browsing_data_cdp(port: int) -> bool:
             // Wait for dialog to appear
             await sleep(2000);
             
-            // Step 2: Find the dialog (it appears after clicking)
-            const dialog = privacyRoot.querySelector('settings-clear-browsing-data-dialog');
-            if (!dialog || !dialog.shadowRoot) return 'error: no clear-browsing-data-dialog after click';
+            // Step 2: Find the dialog
+            const dialog = privacyRoot.querySelector('#deleteBrowsingDataDialog') ||
+                          privacyRoot.querySelector('cr-dialog[id="deleteBrowsingDataDialog"]');
+            if (!dialog) return 'error: no #deleteBrowsingDataDialog';
             
-            const dialogRoot = dialog.shadowRoot;
-            
-            // Step 3: Select "All time" in the time range dropdown (value=4)
-            const dropdown = dialogRoot.querySelector('#clearFromBasic');
-            if (dropdown) {
-                const selectEl = dropdown.shadowRoot ? 
-                    dropdown.shadowRoot.querySelector('select') : null;
-                if (selectEl) {
+            // Step 3: Select "All time" via the time picker
+            const timePicker = dialog.querySelector('#timePicker') ||
+                             dialog.querySelector('settings-clear-browsing-data-time-picker');
+            if (timePicker) {
+                // Try to set time range to "All time"
+                const selectEl = timePicker.shadowRoot ? 
+                    timePicker.shadowRoot.querySelector('select') ||
+                    timePicker.shadowRoot.querySelector('cr-action-menu') : null;
+                if (selectEl && selectEl.tagName === 'SELECT') {
                     selectEl.value = '4';
                     selectEl.dispatchEvent(new Event('change', {bubbles: true}));
-                    await sleep(500);
-                } else {
-                    // Try iron-dropdown or md-select approach
-                    dropdown.value = '4';
-                    dropdown.dispatchEvent(new Event('change', {bubbles: true}));
                     await sleep(500);
                 }
             }
             
-            // Step 4: Click "Delete data" / "Clear data" button
-            const clearBtn = dialogRoot.querySelector('#clearBrowsingDataConfirm');
-            if (!clearBtn) return 'error: no clearBrowsingDataConfirm button';
+            // Step 4: Make sure all checkboxes are checked
+            const checkboxes = dialog.querySelectorAll('settings-checkbox');
+            checkboxes.forEach(cb => {
+                if (!cb.hasAttribute('checked')) {
+                    cb.setAttribute('checked', '');
+                    cb.click();
+                }
+            });
+            await sleep(300);
             
-            clearBtn.click();
+            // Step 5: Click "Delete data" button
+            const deleteBtn = dialog.querySelector('#deleteButton');
+            if (!deleteBtn) return 'error: no #deleteButton';
+            
+            deleteBtn.click();
             await sleep(3000);
             
             return 'success: clicked Delete data button';

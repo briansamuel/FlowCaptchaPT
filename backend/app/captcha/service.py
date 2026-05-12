@@ -421,6 +421,19 @@ class CaptchaService:
                     result.token = token_result["token"]
                     tok_preview = result.token[:30]
                     logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1}, tab_reused={tab_reused}, preview={tok_preview}...)")
+
+                    # Auto close tab after extraction if enabled
+                    from .config_helper import should_auto_close_tabs
+                    if should_auto_close_tabs():
+                        tab_id = self._warm_tabs.get(slot)
+                        if tab_id and cdp:
+                            try:
+                                await cdp.close_tab(tab_id)
+                                logger.info(f"[AutoClose] ✓ Closed tab slot {slot} (id={tab_id[:8]}...)")
+                            except Exception as e:
+                                logger.debug(f"[AutoClose] Failed to close tab: {e}")
+                        self._warm_tabs[slot] = None
+
                     return result
 
                 error = token_result.get("error", "empty token")

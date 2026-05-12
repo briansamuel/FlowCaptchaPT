@@ -99,6 +99,9 @@ class Settings(BaseSettings):
     # Clear browsing data interval (minutes, 0 = disabled)
     clear_data_interval: int = 5
 
+    # Auto close tabs after token extraction (true = close tab after each extraction)
+    auto_close_tabs: bool = True
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

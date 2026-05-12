@@ -100,7 +100,7 @@ class Settings(BaseSettings):
     clear_data_interval: int = 5
 
     # Auto close tabs after token extraction (true = close tab after each extraction)
-    auto_close_tabs: bool = True
+    auto_close_tabs: bool = False
 
     # Server
     host: str = "0.0.0.0"

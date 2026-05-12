@@ -278,7 +278,7 @@ class CaptchaService:
             except Exception:
                 pass
 
-        target_id = await cdp.create_tab(TARGET_URL)
+        target_id = await cdp.create_tab(TARGET_URL, background=True)
         page = await cdp.attach_to_target(target_id)
         self._warm_tabs[slot] = target_id
 

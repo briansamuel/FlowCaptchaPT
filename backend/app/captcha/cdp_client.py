@@ -119,11 +119,14 @@ class RawCDPClient:
         # Allow event loop to process cleanup
         await asyncio.sleep(0.1)
 
-    async def create_tab(self, url: str = "about:blank") -> str:
-        """Create new tab, return targetId."""
-        result = await self.send("Target.createTarget", {"url": url})
+    async def create_tab(self, url: str = "about:blank", background: bool = False) -> str:
+        """Create new tab, return targetId. If background=True, tab won't steal focus."""
+        params = {"url": url}
+        if background:
+            params["background"] = True
+        result = await self.send("Target.createTarget", params)
         target_id = result["result"]["targetId"]
-        logger.info(f"Created tab: {target_id}")
+        logger.info(f"Created tab: {target_id} (background={background})")
         return target_id
 
     async def close_tab(self, target_id: str):

@@ -176,9 +176,9 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         except Exception:
             pass
 
-        # If no blank tab found, create one (background)
+        # If no blank tab found, create one (background - no focus steal)
         if not tab_id:
-            tab_id = await cdp.create_tab("about:blank")
+            tab_id = await cdp.create_tab("about:blank", background=True)
 
         # Attach and navigate to settings
         page = await cdp.attach_to_target(tab_id)

@@ -117,16 +117,23 @@ async def get_profile_info():
 @router.post("/clear-data")
 async def trigger_clear_data():
     """Manually trigger clear browsing data."""
-    from ..captcha.clear_data import clear_browsing_data
-    from ..captcha.service import get_raw_captcha_service
+    from ..captcha.clear_data import clear_all_data
+    from ..captcha.profile_manager import get_profile_manager
 
-    svc = get_raw_captcha_service()
-    port = svc._cdp_port
-    if not port:
-        return {"status": "error", "message": "Chrome not running"}
+    pm = get_profile_manager()
+    profile_dirs = []
+    cdp_ports = []
+    for svc in pm._services:
+        profile_dirs.append(svc.profile_dir)
+        port = svc._cdp_port or getattr(svc, '_cdp_port_override', None)
+        if port:
+            cdp_ports.append(port)
+
+    if not profile_dirs:
+        return {"status": "error", "message": "No profiles found"}
 
     try:
-        await clear_browsing_data(port)
-        return {"status": "ok", "message": "Browsing data cleared"}
+        await clear_all_data(profile_dirs, cdp_ports)
+        return {"status": "ok", "message": f"Browsing data cleared for {len(profile_dirs)} profile(s)"}
     except Exception as e:
         return {"status": "error", "message": str(e)}

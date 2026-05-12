@@ -29,14 +29,22 @@ async def lifespan(app: FastAPI):
 
     # Start clear data scheduler
     from .captcha.clear_data import start_clear_data_scheduler, stop_clear_data_scheduler
-    from .captcha.service import get_raw_captcha_service
+    from .captcha.profile_manager import get_profile_manager
 
-    def _get_cdp_port():
-        svc = get_raw_captcha_service()
-        return svc._cdp_port
+    def _get_clear_data_info():
+        """Collect all profile dirs and CDP ports from the profile manager."""
+        pm = get_profile_manager()
+        profile_dirs = []
+        cdp_ports = []
+        for svc in pm._services:
+            profile_dirs.append(svc.profile_dir)
+            port = svc._cdp_port or getattr(svc, '_cdp_port_override', None)
+            if port:
+                cdp_ports.append(port)
+        return {"profile_dirs": profile_dirs, "cdp_ports": cdp_ports}
 
     if settings.clear_data_interval > 0:
-        start_clear_data_scheduler(settings.clear_data_interval, _get_cdp_port)
+        start_clear_data_scheduler(settings.clear_data_interval, _get_clear_data_info)
         logger.info(f"Clear data scheduler: every {settings.clear_data_interval} minutes")
 
     yield

@@ -433,7 +433,12 @@ async def _flow_request(
 
                     if reason == "PUBLIC_ERROR_UNUSUAL_ACTIVITY_TOO_MUCH_TRAFFIC":
                         logger.warning(f"{tag} Flow API rate-limited [{reason}]: {vi_msg} (no retry, no delay — fail fast)")
-                        raise HTTPException(resp.status, vi_msg)
+                        raise HTTPException(resp.status, detail={
+                            "success": False,
+                            "error": reason,
+                            "message": vi_msg,
+                            "statusCode": resp.status,
+                        })
                     if is_retryable and attempt < FLOW_MAX_RETRIES:
                         logger.warning(
                             f"{tag} Flow API {resp.status} [{reason}] (lần {attempt}/{FLOW_MAX_RETRIES}): {vi_msg}. "
@@ -441,7 +446,12 @@ async def _flow_request(
                         )
                         await asyncio.sleep(FLOW_RETRY_DELAY)
                         continue
-                    raise HTTPException(resp.status, vi_msg)
+                    raise HTTPException(resp.status, detail={
+                        "success": False,
+                        "error": reason,
+                        "message": vi_msg,
+                        "statusCode": resp.status,
+                    })
             except (asyncio.TimeoutError, aiohttp.ClientError) as e:
                 if attempt < FLOW_MAX_RETRIES:
                     logger.warning(f"{tag} Flow API connection error (lần {attempt}/{FLOW_MAX_RETRIES}): {e}. Thử lại...")

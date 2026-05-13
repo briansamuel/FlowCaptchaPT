@@ -727,7 +727,24 @@ async def upscale_image(req: ImageUpscaleRequest):
             )
             if attempt > 1:
                 logger.info(f"{tag} Upscale OK after {attempt} attempts")
-            return {"success": True, "encodedImage": result.get("encodedImage")}
+            encoded = result.get("encodedImage", "")
+            return {
+                "success": True,
+                "batchId": None,
+                "media": [{
+                    "mediaName": None,
+                    "mediaId": req.mediaId,
+                    "fifeUrl": None,
+                    "encodedImage": encoded,
+                    "targetResolution": req.targetResolution,
+                    "seed": None,
+                    "prompt": None,
+                    "aspectRatio": None,
+                    "dimensions": None,
+                }],
+                "remainingCredits": result.get("remainingCredits"),
+                "encodedImage": encoded,
+            }
         except HTTPException as e:
             last_err = e
             detail = str(e.detail) if e.detail else ""
@@ -859,12 +876,7 @@ async def generate_video(req: VideoGenerateRequest):
 
     result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
 
-    operations = []
-    for op in result.get("operations", []):
-        operations.append({
-            "operationName": op.get("operation", {}).get("name"),
-            "sceneId": op.get("sceneId"),
-        })
+    operations = _parse_video_response(result)
 
     return {
         "success": True,
@@ -872,6 +884,41 @@ async def generate_video(req: VideoGenerateRequest):
         "operations": operations,
         "remainingCredits": result.get("remainingCredits"),
     }
+
+
+def _parse_video_response(result: dict) -> list:
+    """Parse video generate response.
+
+    Supports both old schema (operations[]) and new schema (media[] + workflows[]).
+    New schema (current): each media item has name=mediaId, workflowId, mediaMetadata.mediaStatus.
+    """
+    operations = []
+    # New schema: media[]
+    for m in result.get("media", []):
+        media_id = m.get("name")
+        workflow_id = m.get("workflowId")
+        meta = m.get("mediaMetadata", {})
+        status = meta.get("mediaStatus", {}).get("mediaGenerationStatus", "")
+        video_data = m.get("video", {}).get("generatedVideo", {})
+        operations.append({
+            "operationName": media_id,  # used for status polling
+            "mediaId": media_id,
+            "workflowId": workflow_id,
+            "sceneId": "",
+            "status": status,
+            "model": video_data.get("model"),
+            "seed": video_data.get("seed"),
+            "aspectRatio": video_data.get("aspectRatio"),
+            "length": m.get("video", {}).get("dimensions", {}).get("length"),
+        })
+    # Old schema fallback: operations[]
+    if not operations:
+        for op in result.get("operations", []):
+            operations.append({
+                "operationName": op.get("operation", {}).get("name"),
+                "sceneId": op.get("sceneId"),
+            })
+    return operations
 
 
 @router.post("/videos/generate-v2")
@@ -965,12 +1012,7 @@ async def generate_video_v2(req: VideoGenerateRequest):
 
     result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
 
-    operations = []
-    for op in result.get("operations", []):
-        operations.append({
-            "operationName": op.get("operation", {}).get("name"),
-            "sceneId": op.get("sceneId"),
-        })
+    operations = _parse_video_response(result)
 
     return {
         "success": True,

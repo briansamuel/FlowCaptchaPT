@@ -184,83 +184,83 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         else:
             logger.info(f"[ClearData] ➤ Step 2: Reusing existing blank tab")
 
-        # Attach and navigate to settings
+        # Attach and navigate to settings (clearBrowserData URL auto-opens the dialog)
         page = await cdp.attach_to_target(tab_id)
-        await page.navigate("chrome://settings/privacy")
-        logger.info(f"[ClearData] ➤ Step 3: Navigated to chrome://settings/privacy")
+        await page.navigate("chrome://settings/clearBrowserData")
+        logger.info(f"[ClearData] ➤ Step 3: Navigated to chrome://settings/clearBrowserData")
 
-        # Wait for page to load
-        await asyncio.sleep(3)
+        # Wait for page + dialog to load
+        await asyncio.sleep(5)
 
-        # Attach to the tab
+        # Re-attach
         page = await cdp.attach_to_target(tab_id)
-
-        # Wait for settings page to fully render
-        await asyncio.sleep(2)
         logger.info(f"[ClearData] ➤ Step 4: Settings page loaded, executing clear script...")
 
-        # Script to click "Delete browsing data" link, select "All time", then click "Delete data"
+        # Script using recursive shadow DOM search - works across Chrome versions
         clear_script = """
         (async () => {
             const sleep = ms => new Promise(r => setTimeout(r, ms));
             
-            // Navigate through shadow DOM to find the privacy page
-            const settingsUi = document.querySelector('settings-ui');
-            if (!settingsUi || !settingsUi.shadowRoot) return 'error: no settings-ui';
+            // Recursive search through all shadow DOMs
+            function deepQuery(root, selector) {
+                let result = root.querySelector(selector);
+                if (result) return result;
+                const allElements = root.querySelectorAll('*');
+                for (const el of allElements) {
+                    if (el.shadowRoot) {
+                        result = deepQuery(el.shadowRoot, selector);
+                        if (result) return result;
+                    }
+                }
+                return null;
+            }
             
-            const settingsMain = settingsUi.shadowRoot.querySelector('settings-main');
-            if (!settingsMain || !settingsMain.shadowRoot) return 'error: no settings-main';
+            // Wait for dialog to appear (clearBrowserData URL should auto-open it)
+            let deleteBtn = null;
+            for (let i = 0; i < 10; i++) {
+                deleteBtn = deepQuery(document, '#deleteButton');
+                if (deleteBtn) break;
+                await sleep(1000);
+            }
             
-            const basicPage = settingsMain.shadowRoot.querySelector('settings-basic-page');
-            if (!basicPage || !basicPage.shadowRoot) return 'error: no settings-basic-page';
+            if (!deleteBtn) {
+                // Try clicking the clearBrowsingData link if dialog didn't auto-open
+                const clearLink = deepQuery(document, '#clearBrowsingData');
+                if (clearLink) {
+                    clearLink.click();
+                    await sleep(2000);
+                    deleteBtn = deepQuery(document, '#deleteButton');
+                }
+            }
             
-            const privacyPage = basicPage.shadowRoot.querySelector('settings-privacy-page');
-            if (!privacyPage || !privacyPage.shadowRoot) return 'error: no settings-privacy-page';
+            if (!deleteBtn) return 'error: #deleteButton not found';
             
-            const privacyRoot = privacyPage.shadowRoot;
-            
-            // Step 1: Click "Delete browsing data" link to open the dialog
-            const clearLink = privacyRoot.querySelector('#clearBrowsingData');
-            if (!clearLink) return 'error: no #clearBrowsingData link';
-            clearLink.click();
-            
-            // Wait for dialog to appear
-            await sleep(2000);
-            
-            // Step 2: Find the dialog
-            const dialog = privacyRoot.querySelector('#deleteBrowsingDataDialog') ||
-                          privacyRoot.querySelector('cr-dialog[id="deleteBrowsingDataDialog"]');
-            if (!dialog) return 'error: no #deleteBrowsingDataDialog';
-            
-            // Step 3: Select "All time" via the time picker
-            const timePicker = dialog.querySelector('#timePicker') ||
-                             dialog.querySelector('settings-clear-browsing-data-time-picker');
+            // Try to set time range to "All time"
+            const timePicker = deepQuery(document, '#timePicker');
             if (timePicker) {
-                // Try to set time range to "All time"
                 const selectEl = timePicker.shadowRoot ? 
-                    timePicker.shadowRoot.querySelector('select') ||
-                    timePicker.shadowRoot.querySelector('cr-action-menu') : null;
-                if (selectEl && selectEl.tagName === 'SELECT') {
+                    timePicker.shadowRoot.querySelector('select') : null;
+                if (selectEl) {
                     selectEl.value = '4';
                     selectEl.dispatchEvent(new Event('change', {bubbles: true}));
                     await sleep(500);
                 }
             }
             
-            // Step 4: Make sure all checkboxes are checked
-            const checkboxes = dialog.querySelectorAll('settings-checkbox');
-            checkboxes.forEach(cb => {
-                if (!cb.hasAttribute('checked')) {
-                    cb.setAttribute('checked', '');
-                    cb.click();
-                }
-            });
-            await sleep(300);
+            // Make sure all checkboxes are checked
+            const dialog = deepQuery(document, '#deleteBrowsingDataDialog');
+            if (dialog) {
+                const checkboxes = dialog.querySelectorAll('settings-checkbox');
+                checkboxes.forEach(cb => {
+                    if (!cb.hasAttribute('checked')) {
+                        cb.setAttribute('checked', '');
+                        cb.click();
+                    }
+                });
+                await sleep(300);
+            }
             
-            // Step 5: Click "Delete data" button
-            const deleteBtn = dialog.querySelector('#deleteButton');
-            if (!deleteBtn) return 'error: no #deleteButton';
-            
+            // Click Delete data
             deleteBtn.click();
             await sleep(3000);
             

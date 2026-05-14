@@ -342,20 +342,41 @@ async def _periodic_clear(interval_minutes: int, get_info_fn: Callable):
     logger.info(f"[ClearData] Scheduler started - interval: every {interval_minutes} minutes")
 
     while True:
-        await asyncio.sleep(interval_seconds)
+        try:
+            await asyncio.sleep(interval_seconds)
+        except asyncio.CancelledError:
+            logger.info("[ClearData] Scheduler cancelled")
+            return
+
         try:
             info = get_info_fn()
             profile_dirs = info.get("profile_dirs", [])
             cdp_ports = info.get("cdp_ports", [])
 
             if not profile_dirs:
-                logger.debug("[ClearData] No profiles found, skipping")
+                logger.info("[ClearData] No profiles found, skipping this cycle")
                 continue
 
             await clear_all_data(profile_dirs, cdp_ports)
 
+        except asyncio.CancelledError:
+            logger.info("[ClearData] Scheduler cancelled during clear")
+            return
         except Exception as e:
             logger.error(f"[ClearData] Scheduler error: {e}", exc_info=True)
+            # Continue running - don't let one error kill the scheduler
+
+
+def _on_task_done(task: asyncio.Task):
+    """Callback when scheduler task finishes (should not happen normally)."""
+    try:
+        exc = task.exception()
+        if exc:
+            logger.error(f"[ClearData] Scheduler task died with exception: {exc}", exc_info=exc)
+        else:
+            logger.warning("[ClearData] Scheduler task ended unexpectedly")
+    except asyncio.CancelledError:
+        logger.info("[ClearData] Scheduler task was cancelled")
 
 
 def start_clear_data_scheduler(interval_minutes: int, get_info_fn: Callable):
@@ -376,6 +397,7 @@ def start_clear_data_scheduler(interval_minutes: int, get_info_fn: Callable):
         logger.info("[ClearData] Scheduler already running")
         return
     _clear_task = asyncio.ensure_future(_periodic_clear(interval_minutes, get_info_fn))
+    _clear_task.add_done_callback(_on_task_done)
     logger.info(f"[ClearData] Scheduler registered - will clear every {interval_minutes} min")
 
 

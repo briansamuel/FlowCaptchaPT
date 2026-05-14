@@ -38,7 +38,7 @@ def _clear_history_files(profile_dir: str):
         history_file = root / "History"
         if history_file.exists():
             try:
-                conn = sqlite3.connect(str(history_file))
+                conn = sqlite3.connect(str(history_file), timeout=5)
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM urls")
                 cursor.execute("DELETE FROM visits")
@@ -54,6 +54,11 @@ def _clear_history_files(profile_dir: str):
                 conn.commit()
                 conn.close()
                 logger.info(f"[ClearData] ✓ Cleared history DB: {history_file}")
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e):
+                    logger.info(f"[ClearData] ⏭ History DB locked by Chrome, skipping (CDP clear handles this)")
+                else:
+                    logger.warning(f"[ClearData] Could not clear {history_file}: {e}")
             except Exception as e:
                 logger.warning(f"[ClearData] Could not clear {history_file}: {e}")
 
@@ -61,12 +66,17 @@ def _clear_history_files(profile_dir: str):
         cookies_file = root / "Cookies"
         if cookies_file.exists():
             try:
-                conn = sqlite3.connect(str(cookies_file))
+                conn = sqlite3.connect(str(cookies_file), timeout=5)
                 cursor = conn.cursor()
                 cursor.execute("DELETE FROM cookies")
                 conn.commit()
                 conn.close()
                 logger.info(f"[ClearData] ✓ Cleared cookies DB: {cookies_file}")
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e):
+                    logger.info(f"[ClearData] ⏭ Cookies DB locked by Chrome, skipping (CDP clear handles this)")
+                else:
+                    logger.warning(f"[ClearData] Could not clear {cookies_file}: {e}")
             except Exception as e:
                 logger.warning(f"[ClearData] Could not clear {cookies_file}: {e}")
 

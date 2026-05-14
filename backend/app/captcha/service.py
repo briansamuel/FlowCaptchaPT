@@ -426,14 +426,18 @@ class CaptchaService:
 
                     # Auto close tab after extraction if enabled
                     from .config_helper import should_auto_close_tabs
-                    if should_auto_close_tabs():
-                        tab_id = self._warm_tabs.get(slot)
-                        if tab_id and cdp:
+                    auto_close = should_auto_close_tabs()
+                    logger.info(f"[AutoClose] auto_close_tabs={auto_close}, slot={slot}, warm_tab={self._warm_tabs.get(slot)}")
+                    if auto_close:
+                        close_tab_id = self._warm_tabs.get(slot)
+                        if close_tab_id and cdp:
                             try:
-                                await cdp.close_tab(tab_id)
-                                logger.info(f"[AutoClose] ✓ Closed tab slot {slot} (id={tab_id[:8]}...)")
+                                await cdp.close_tab(close_tab_id)
+                                logger.info(f"[AutoClose] ✓ Closed tab slot {slot} (id={close_tab_id[:8]}...)")
                             except Exception as e:
-                                logger.debug(f"[AutoClose] Failed to close tab: {e}")
+                                logger.warning(f"[AutoClose] ✗ Failed to close tab slot {slot}: {e}")
+                        elif not close_tab_id:
+                            logger.warning(f"[AutoClose] No tab_id for slot {slot}")
                         self._warm_tabs[slot] = None
 
                     return result

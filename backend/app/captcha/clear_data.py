@@ -189,8 +189,8 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         await page.navigate("chrome://settings/clearBrowserData")
         logger.info(f"[ClearData] ➤ Step 3: Navigated to chrome://settings/clearBrowserData")
 
-        # Wait for page + dialog to load
-        await asyncio.sleep(5)
+        # Wait for page + dialog to load (reduced for VPS)
+        await asyncio.sleep(3)
 
         # Re-attach
         page = await cdp.attach_to_target(tab_id)
@@ -268,7 +268,7 @@ async def clear_browsing_data_cdp(port: int) -> bool:
         })()
         """
 
-        result = await page.evaluate(clear_script, timeout=30)
+        result = await page.evaluate(clear_script, timeout=20)
         logger.info(f"[ClearData] ➤ Step 5: Script result: {result}")
 
         if result and 'success' in str(result):
@@ -312,7 +312,7 @@ async def clear_browsing_data_cdp(port: int) -> bool:
 async def clear_all_data(profile_dirs: List[str], cdp_ports: List[int]):
     """
     Full clear of browsing data:
-    1. CDP: clear cache + cookies for each running Chrome instance
+    1. CDP: clear cache + cookies for each running Chrome instance (with timeout)
     2. File system: clear history DB + cache directories for each profile
     """
     logger.info("=" * 60)
@@ -320,12 +320,18 @@ async def clear_all_data(profile_dirs: List[str], cdp_ports: List[int]):
     logger.info(f"[ClearData] Profiles: {len(profile_dirs)}, CDP ports: {cdp_ports}")
     logger.info("=" * 60)
 
-    # Step 1: CDP clear (cache + cookies)
+    # Step 1: CDP clear (with hard timeout to prevent stuck)
+    CDP_CLEAR_TIMEOUT = 40  # seconds max per port
     for port in cdp_ports:
         if port:
-            await clear_browsing_data_cdp(port)
+            try:
+                await asyncio.wait_for(clear_browsing_data_cdp(port), timeout=CDP_CLEAR_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.error(f"[ClearData] ✗ CDP clear TIMEOUT after {CDP_CLEAR_TIMEOUT}s (port={port}) - skipping")
+            except Exception as e:
+                logger.error(f"[ClearData] ✗ CDP clear error (port={port}): {e}")
 
-    # Step 2: File system clear (history + download history + cache files)
+    # Step 2: File system clear (instant, never blocks)
     for profile_dir in profile_dirs:
         logger.info(f"[ClearData] Clearing files for profile: {profile_dir}")
         _clear_history_files(profile_dir)

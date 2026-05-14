@@ -182,16 +182,19 @@ class PageSession:
         finally:
             self.client._pending.pop(msg_id, None)
 
-    async def navigate(self, url: str):
+    async def navigate(self, url: str, timeout: float = 30):
         """Navigate without enabling Page domain (no Page.enable)."""
-        result = await self.send("Page.navigate", {"url": url}, timeout=120)
+        result = await self.send("Page.navigate", {"url": url}, timeout=timeout)
         if "error" in result:
             raise RuntimeError(f"Navigate failed: {result['error']}")
-        # Wait for load by polling document.readyState
-        for _ in range(120):
-            state = await self.evaluate("document.readyState")
-            if state in ("complete", "interactive"):
-                return
+        # Wait for load by polling document.readyState (max 20s)
+        for _ in range(40):
+            try:
+                state = await self.evaluate("document.readyState")
+                if state in ("complete", "interactive"):
+                    return
+            except Exception:
+                pass
             await asyncio.sleep(0.5)
 
     async def evaluate(self, expression: str, timeout: float = 30):

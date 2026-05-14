@@ -339,19 +339,27 @@ async def clear_all_data(profile_dirs: List[str], cdp_ports: List[int]):
 async def _periodic_clear(interval_minutes: int, get_info_fn: Callable):
     """Background task that clears data every N minutes."""
     interval_seconds = interval_minutes * 60
-    logger.info(f"[ClearData] Scheduler started - interval: every {interval_minutes} minutes")
+    logger.info(f"[ClearData] ✓ Scheduler ACTIVE - will clear every {interval_minutes} minutes ({interval_seconds}s)")
+    cycle = 0
 
     while True:
+        cycle += 1
+        logger.info(f"[ClearData] ⏳ Next clear in {interval_minutes} minutes (cycle #{cycle})...")
+
         try:
             await asyncio.sleep(interval_seconds)
         except asyncio.CancelledError:
-            logger.info("[ClearData] Scheduler cancelled")
+            logger.info("[ClearData] Scheduler cancelled during sleep")
             return
+
+        logger.info(f"[ClearData] ⏰ Timer fired! Starting clear cycle #{cycle}...")
 
         try:
             info = get_info_fn()
             profile_dirs = info.get("profile_dirs", [])
             cdp_ports = info.get("cdp_ports", [])
+
+            logger.info(f"[ClearData] Collected info: profiles={profile_dirs}, ports={cdp_ports}")
 
             if not profile_dirs:
                 logger.info("[ClearData] No profiles found, skipping this cycle")
@@ -363,7 +371,7 @@ async def _periodic_clear(interval_minutes: int, get_info_fn: Callable):
             logger.info("[ClearData] Scheduler cancelled during clear")
             return
         except Exception as e:
-            logger.error(f"[ClearData] Scheduler error: {e}", exc_info=True)
+            logger.error(f"[ClearData] Scheduler error in cycle #{cycle}: {e}", exc_info=True)
             # Continue running - don't let one error kill the scheduler
 
 

@@ -46,6 +46,8 @@ async def lifespan(app: FastAPI):
     if settings.clear_data_interval > 0:
         start_clear_data_scheduler(settings.clear_data_interval, _get_clear_data_info)
         logger.info(f"Clear data scheduler: every {settings.clear_data_interval} minutes")
+    else:
+        logger.info(f"Clear data scheduler: DISABLED (FC_CLEAR_DATA_INTERVAL={settings.clear_data_interval})")
 
     yield
 

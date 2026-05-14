@@ -494,7 +494,7 @@ async def _upload_reference_image(
     media_id = result.get("media", {}).get("name")
     if not media_id:
         raise HTTPException(500, "Upload reference image failed: no mediaId")
-    logger.info(f"Uploaded reference image: {media_id}")
+    logger.debug(f"Uploaded reference image: {media_id}")
     return media_id
 
 

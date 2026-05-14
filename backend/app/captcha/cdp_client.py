@@ -51,7 +51,7 @@ class RawCDPClient:
     async def connect(self):
         """Connect to browser-level websocket."""
         ws_url = await self._get_ws_url()
-        logger.info(f"Connecting to browser WS: {ws_url}")
+        logger.debug(f"Connecting to browser WS: {ws_url}")
         self._session = aiohttp.ClientSession()
         self._ws = await self._session.ws_connect(ws_url, max_msg_size=50*1024*1024)
         self._reader_task = asyncio.ensure_future(self._reader())
@@ -126,7 +126,7 @@ class RawCDPClient:
             params["background"] = True
         result = await self.send("Target.createTarget", params)
         target_id = result["result"]["targetId"]
-        logger.info(f"Created tab: {target_id} (background={background})")
+        logger.debug(f"Created tab: {target_id} (background={background})")
         return target_id
 
     async def close_tab(self, target_id: str):

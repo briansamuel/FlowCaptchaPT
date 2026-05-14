@@ -325,7 +325,7 @@ class CaptchaService:
         if result == 'timeout':
             raise RuntimeError("grecaptcha not ready after 20s")
 
-        logger.info(f"Tab slot {slot} ready (tab={target_id[:12]})")
+        logger.debug(f"Tab slot {slot} ready (tab={target_id[:12]})")
         return page
 
     async def _extract_via_cdp(self, action: str, wait_delay: int = 0, slot: int = 0) -> CaptchaResult:
@@ -366,7 +366,7 @@ class CaptchaService:
                     )
                     check_data = json.loads(check) if isinstance(check, str) else {}
                     if check_data.get("ready") and "labs.google" in str(check_data.get("url", "")):
-                        logger.info(f"Reusing warm tab slot {slot}")
+                        logger.debug(f"Reusing warm tab slot {slot}")
                         tab_reused = True
                     else:
                         page = None
@@ -380,7 +380,7 @@ class CaptchaService:
             # Simple wait before mint
             effective_delay = min(wait_delay, 5) if tab_reused else min(wait_delay, 10)
             if effective_delay > 0:
-                logger.info(f"Slot {slot}: waiting {effective_delay}s (reused={tab_reused})")
+                logger.debug(f"Slot {slot}: waiting {effective_delay}s (reused={tab_reused})")
                 await asyncio.sleep(effective_delay)
 
             # --- Token mint: single evaluate call ---

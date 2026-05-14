@@ -325,37 +325,31 @@ async def clear_all_data(profile_dirs: List[str], cdp_ports: List[int]):
     1. CDP: clear cache + cookies for each running Chrome instance (with timeout)
     2. File system: clear history DB + cache directories for each profile
     """
-    from .chrome_lock import acquire_for_clear, release_for_clear
+    logger.info("=" * 60)
+    logger.info("[ClearData] Starting scheduled clear browsing data...")
+    logger.info(f"[ClearData] Profiles: {len(profile_dirs)}, CDP ports: {cdp_ports}")
+    logger.info("=" * 60)
 
-    try:
-        await acquire_for_clear()
-        logger.info("=" * 60)
-        logger.info("[ClearData] Starting scheduled clear browsing data...")
-        logger.info(f"[ClearData] Profiles: {len(profile_dirs)}, CDP ports: {cdp_ports}")
-        logger.info("=" * 60)
+    # Step 1: CDP clear (with hard timeout to prevent stuck)
+    CDP_CLEAR_TIMEOUT = 40  # seconds max per port
+    for port in cdp_ports:
+        if port:
+            try:
+                await asyncio.wait_for(clear_browsing_data_cdp(port), timeout=CDP_CLEAR_TIMEOUT)
+            except asyncio.TimeoutError:
+                logger.error(f"[ClearData] ✗ CDP clear TIMEOUT after {CDP_CLEAR_TIMEOUT}s (port={port}) - skipping")
+            except Exception as e:
+                logger.error(f"[ClearData] ✗ CDP clear error (port={port}): {e}")
 
-        # Step 1: CDP clear (with hard timeout to prevent stuck)
-        CDP_CLEAR_TIMEOUT = 40  # seconds max per port
-        for port in cdp_ports:
-            if port:
-                try:
-                    await asyncio.wait_for(clear_browsing_data_cdp(port), timeout=CDP_CLEAR_TIMEOUT)
-                except asyncio.TimeoutError:
-                    logger.error(f"[ClearData] ✗ CDP clear TIMEOUT after {CDP_CLEAR_TIMEOUT}s (port={port}) - skipping")
-                except Exception as e:
-                    logger.error(f"[ClearData] ✗ CDP clear error (port={port}): {e}")
+    # Step 2: File system clear (instant, never blocks)
+    for profile_dir in profile_dirs:
+        logger.info(f"[ClearData] Clearing files for profile: {profile_dir}")
+        _clear_history_files(profile_dir)
+        _clear_cache_dirs(profile_dir)
 
-        # Step 2: File system clear (instant, never blocks)
-        for profile_dir in profile_dirs:
-            logger.info(f"[ClearData] Clearing files for profile: {profile_dir}")
-            _clear_history_files(profile_dir)
-            _clear_cache_dirs(profile_dir)
-
-        logger.info("=" * 60)
-        logger.info("[ClearData] ✓ Clear browsing data completed!")
-        logger.info("=" * 60)
-    finally:
-        release_for_clear()
+    logger.info("=" * 60)
+    logger.info("[ClearData] ✓ Clear browsing data completed!")
+    logger.info("=" * 60)
 
 
 async def _periodic_clear(interval_minutes: int, get_info_fn: Callable):

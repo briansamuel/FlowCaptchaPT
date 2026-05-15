@@ -432,6 +432,13 @@ class CaptchaService:
                 except Exception as eval_err:
                     if attempt < max_attempts - 1:
                         logger.warning(f"Slot {slot} attempt {attempt+1}: evaluate exception: {eval_err}")
+                        # Close failed tab before creating new one
+                        old_tab = self._warm_tabs.get(slot)
+                        if old_tab and cdp:
+                            try:
+                                await cdp.close_tab(old_tab)
+                            except Exception:
+                                pass
                         self._warm_tabs[slot] = None
                         page = await self._setup_warm_tab(cdp, slot)
                         continue
@@ -443,30 +450,28 @@ class CaptchaService:
 
                 if token_result.get("success") and token_result.get("token"):
                     result.token = token_result["token"]
-                    tok_preview = result.token[:30]
-                    logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1}, tab_reused={tab_reused}, preview={tok_preview}...)")
+                    logger.info(f"Got {action} token (slot {slot}, attempt {attempt+1})")
 
-                    # Auto close tab after extraction if enabled
-                    from .config_helper import should_auto_close_tabs
-                    auto_close = should_auto_close_tabs()
-                    logger.info(f"[AutoClose] auto_close_tabs={auto_close}, slot={slot}, warm_tab={self._warm_tabs.get(slot)}")
-                    if auto_close:
-                        close_tab_id = self._warm_tabs.get(slot)
-                        if close_tab_id and cdp:
-                            try:
-                                await cdp.close_tab(close_tab_id)
-                                logger.info(f"[AutoClose] ✓ Closed tab slot {slot} (id={close_tab_id[:8]}...)")
-                            except Exception as e:
-                                logger.warning(f"[AutoClose] ✗ Failed to close tab slot {slot}: {e}")
-                        elif not close_tab_id:
-                            logger.warning(f"[AutoClose] No tab_id for slot {slot}")
-                        self._warm_tabs[slot] = None
-
+                    # Always close tab after successful extraction
+                    close_tab_id = self._warm_tabs.get(slot)
+                    if close_tab_id and cdp:
+                        try:
+                            await cdp.close_tab(close_tab_id)
+                        except Exception:
+                            pass
+                    self._warm_tabs[slot] = None
                     return result
 
                 error = token_result.get("error", "empty token")
                 if attempt < max_attempts - 1:
                     logger.warning(f"Slot {slot} attempt {attempt+1}: {error} — recreating tab")
+                    # Close failed tab before creating new one
+                    old_tab = self._warm_tabs.get(slot)
+                    if old_tab and cdp:
+                        try:
+                            await cdp.close_tab(old_tab)
+                        except Exception:
+                            pass
                     self._warm_tabs[slot] = None
                     page = await self._setup_warm_tab(cdp, slot)
                     continue
@@ -480,6 +485,13 @@ class CaptchaService:
         except Exception as e:
             logger.error(f"CDP extraction failed slot {slot}: {e}")
             result.error = str(e)
+            # Close any leftover tab on error
+            tab_to_close = self._warm_tabs.get(slot)
+            if tab_to_close and cdp:
+                try:
+                    await cdp.close_tab(tab_to_close)
+                except Exception:
+                    pass
             self._warm_tabs[slot] = None
             return result
         finally:

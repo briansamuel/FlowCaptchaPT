@@ -282,18 +282,23 @@ class CaptchaService:
         page = await cdp.attach_to_target(target_id)
         self._warm_tabs[slot] = target_id
 
-        # Wait for page load
-        for _ in range(30):
+        # Wait for page load — handle context destruction during SPA navigation
+        for _ in range(40):
             try:
                 state = await page.evaluate("document.readyState")
                 if state in ("complete", "interactive"):
                     break
             except Exception:
-                pass
-            await asyncio.sleep(1)
+                # Context destroyed (page navigating) — re-attach and retry
+                await asyncio.sleep(1)
+                try:
+                    page = await cdp.attach_to_target(target_id)
+                except Exception:
+                    pass
+            await asyncio.sleep(0.5)
 
-        # Let page settle and reCAPTCHA script initialize naturally
-        await asyncio.sleep(2)
+        # Let page fully settle (SPA hydration, Next.js client-side routing)
+        await asyncio.sleep(3)
 
         # Single evaluate: check if reCAPTCHA loaded, inject if not, then wait
         bootstrap_js = f"""
@@ -321,9 +326,26 @@ class CaptchaService:
                 return 'timeout';
             }})()
         """
-        result = await page.evaluate(bootstrap_js, timeout=25)
-        if result == 'timeout':
-            raise RuntimeError("grecaptcha not ready after 20s")
+        # Retry bootstrap if context gets destroyed (SPA re-render)
+        for bootstrap_attempt in range(3):
+            try:
+                result = await page.evaluate(bootstrap_js, timeout=25)
+                if result == 'ready':
+                    break
+                if result == 'timeout':
+                    raise RuntimeError("grecaptcha not ready after 20s")
+            except RuntimeError:
+                raise
+            except Exception as e:
+                if bootstrap_attempt < 2:
+                    logger.debug(f"Bootstrap attempt {bootstrap_attempt+1} failed: {e}, retrying...")
+                    await asyncio.sleep(2)
+                    try:
+                        page = await cdp.attach_to_target(target_id)
+                    except Exception:
+                        pass
+                else:
+                    raise RuntimeError(f"Bootstrap failed after 3 attempts: {e}")
 
         logger.debug(f"Tab slot {slot} ready (tab={target_id[:12]})")
         return page

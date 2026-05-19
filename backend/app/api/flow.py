@@ -36,8 +36,43 @@ class TokenSession:
         self.access_token = access_token
         self.cookies = cookies
         self.expires_at = expires_at
+        self.last_used: float = 0
+        self.use_count: int = 0
 
 _token_store: Dict[str, TokenSession] = {}
+
+
+class SessionRotator:
+    """Round-robin session selector with least-recently-used fallback."""
+
+    def __init__(self):
+        self._index: int = 0
+
+    def next(self) -> Optional[str]:
+        """Pick next session using round-robin + LRU.
+        Returns projectId or None if no sessions available.
+        """
+        if not _token_store:
+            return None
+
+        sessions = list(_token_store.items())
+        # Filter only sessions with valid tokens
+        valid = [(pid, s) for pid, s in sessions if s.access_token]
+        if not valid:
+            return None
+
+        # Sort by last_used time (ascending) to pick least recently used
+        valid.sort(key=lambda x: x[1].last_used)
+
+        # Pick the least recently used session
+        chosen_pid, chosen_session = valid[0]
+        chosen_session.last_used = time.time()
+        chosen_session.use_count += 1
+        logger.debug(f"SessionRotator: picked {chosen_pid[:8]}... (used {chosen_session.use_count}x)")
+        return chosen_pid
+
+
+_session_rotator = SessionRotator()
 
 
 async def _refresh_access_token(project_id: str) -> Optional[str]:
@@ -84,8 +119,8 @@ class ImageReference(BaseModel):
 
 
 class ImageGenerateRequest(BaseModel):
-    accessToken: str
-    projectId: str
+    accessToken: str = ""
+    projectId: str = "auto"
     promptText: str
     aspectRatio: str = "IMAGE_ASPECT_RATIO_SQUARE"
     imageModel: str = "GEM_PIX_2"
@@ -112,8 +147,8 @@ class ReferenceImage(BaseModel):
 
 
 class VideoGenerateRequest(BaseModel):
-    accessToken: str
-    projectId: str
+    accessToken: str = ""
+    projectId: str = "auto"
     promptText: str
     aspectRatio: str = "VIDEO_ASPECT_RATIO_LANDSCAPE"
     videoModelKey: str = "veo_3_1_t2v_fast_4s"
@@ -127,6 +162,22 @@ class VideoGenerateRequest(BaseModel):
     endImageMimeType: str = "image/jpeg"
     endImageAspectRatio: str = "IMAGE_ASPECT_RATIO_LANDSCAPE"
     # R2V: reference images (1-3), uses separate endpoint
+    referenceImages: Optional[List[ReferenceImage]] = None
+    referenceAudio: str = "zephyr"
+
+
+class VideoEditRequest(BaseModel):
+    accessToken: str = ""
+    projectId: str = "auto"
+    promptText: str
+    aspectRatio: str = "VIDEO_ASPECT_RATIO_LANDSCAPE"
+    videoModelKey: str = "abra_edit"
+    seed: Optional[int] = None
+    # Source video to edit
+    videoMediaId: str
+    startFrameIndex: int = 0
+    endFrameIndex: int = 240
+    # Reference images (optional, 1-3)
     referenceImages: Optional[List[ReferenceImage]] = None
     referenceAudio: str = "zephyr"
 
@@ -200,6 +251,31 @@ async def manual_refresh(project_id: str):
     return {"success": True, "accessToken": new_token}
 
 
+@router.get("/sessions/next")
+async def next_session():
+    """Get next session in round-robin rotation (for external clients)."""
+    picked = _session_rotator.next()
+    if not picked:
+        raise HTTPException(404, "No sessions available")
+    return {"projectId": picked}
+
+
+@router.get("/sessions/stats")
+async def session_stats():
+    """Get usage stats for all sessions."""
+    stats = []
+    for pid, s in _token_store.items():
+        stats.append({
+            "projectId": pid,
+            "hasToken": bool(s.access_token),
+            "hasCookies": bool(s.cookies),
+            "lastUsed": s.last_used,
+            "useCount": s.use_count,
+        })
+    stats.sort(key=lambda x: x["lastUsed"], reverse=True)
+    return {"sessions": stats, "total": len(stats)}
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -258,8 +334,31 @@ def _resolve_token(access_token: str, project_id: str = "") -> str:
     if project_id and project_id in _token_store:
         stored = _token_store[project_id]
         if stored.access_token:
+            stored.last_used = time.time()
+            stored.use_count += 1
             return stored.access_token
     return access_token
+
+
+def _pick_session(project_id: str, access_token: str) -> tuple[str, str]:
+    """Pick session with round-robin rotation.
+    If projectId is "auto" or empty, rotate through available sessions.
+    Returns (resolved_project_id, resolved_access_token).
+    """
+    if project_id and project_id != "auto" and project_id in _token_store:
+        # Explicit session requested
+        token = _resolve_token(access_token, project_id)
+        return project_id, token
+
+    # Auto-rotate: pick least recently used session
+    picked_pid = _session_rotator.next()
+    if picked_pid:
+        stored = _token_store[picked_pid]
+        logger.info(f"Auto-rotate: picked session {picked_pid[:8]}...")
+        return picked_pid, stored.access_token
+
+    # Fallback: use whatever was provided
+    return project_id, access_token
 
 
 def _headers(access_token: str) -> dict:
@@ -533,7 +632,7 @@ async def _upload_user_image(
 @router.post("/images/generate")
 async def generate_image(req: ImageGenerateRequest):
     """Generate image (T2I). Include referenceImages or referenceImageBase64 for I2I."""
-    token = _resolve_token(req.accessToken, req.projectId)
+    project_id, token = _pick_session(req.projectId, req.accessToken)
     image_inputs: list = []
     upload_tasks: list = []
 
@@ -541,14 +640,14 @@ async def generate_image(req: ImageGenerateRequest):
         for ref in req.referenceImages:
             upload_tasks.append(
                 _upload_reference_image(
-                    token, req.projectId,
+                    token, project_id,
                     ref.base64, ref.mimeType, ref.fileName,
                 )
             )
     elif req.referenceImageBase64:
         upload_tasks.append(
             _upload_reference_image(
-                token, req.projectId,
+                token, project_id,
                 req.referenceImageBase64, req.referenceImageMimeType,
                 req.referenceImageFileName,
             )
@@ -563,7 +662,7 @@ async def generate_image(req: ImageGenerateRequest):
             })
 
     recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha)
+    ctx = _client_context(project_id, recaptcha)
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
@@ -583,10 +682,10 @@ async def generate_image(req: ImageGenerateRequest):
 
     result = await _flow_request(
         "POST",
-        f"{FLOW_API_BASE}/projects/{req.projectId}/flowMedia:batchGenerateImages",
+        f"{FLOW_API_BASE}/projects/{project_id}/flowMedia:batchGenerateImages",
         token,
         body,
-        project_id=req.projectId,
+        project_id=project_id,
     )
 
     media_out = []
@@ -621,7 +720,7 @@ async def generate_image_v2(req: ImageGenerateRequest):
     Default imageModel changed to NARWHAL (vs GEM_PIX_2 in V1).
     Same payload structure as V1 (already matches).
     """
-    token = _resolve_token(req.accessToken, req.projectId)
+    project_id, token = _pick_session(req.projectId, req.accessToken)
     image_inputs: list = []
     upload_tasks: list = []
 
@@ -629,14 +728,14 @@ async def generate_image_v2(req: ImageGenerateRequest):
         for ref in req.referenceImages:
             upload_tasks.append(
                 _upload_reference_image(
-                    token, req.projectId,
+                    token, project_id,
                     ref.base64, ref.mimeType, ref.fileName,
                 )
             )
     elif req.referenceImageBase64:
         upload_tasks.append(
             _upload_reference_image(
-                token, req.projectId,
+                token, project_id,
                 req.referenceImageBase64, req.referenceImageMimeType,
                 req.referenceImageFileName,
             )
@@ -651,7 +750,7 @@ async def generate_image_v2(req: ImageGenerateRequest):
             })
 
     recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha)
+    ctx = _client_context(project_id, recaptcha)
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
@@ -674,10 +773,10 @@ async def generate_image_v2(req: ImageGenerateRequest):
 
     result = await _flow_request(
         "POST",
-        f"{FLOW_API_BASE}/projects/{req.projectId}/flowMedia:batchGenerateImages",
+        f"{FLOW_API_BASE}/projects/{project_id}/flowMedia:batchGenerateImages",
         token,
         body,
-        project_id=req.projectId,
+        project_id=project_id,
     )
 
     media_out = []
@@ -704,13 +803,13 @@ async def generate_image_v2(req: ImageGenerateRequest):
 @router.post("/images/upscale")
 async def upscale_image(req: ImageUpscaleRequest):
     """Upscale image to 2K/4K. Returns base64 JPEG. Retries on UNUSUAL_ACTIVITY with fresh captcha."""
-    token = _resolve_token(req.accessToken, req.projectId)
-    tag = f"[{req.projectId[:8]}]"
+    project_id, token = _pick_session(req.projectId, req.accessToken)
+    tag = f"[{project_id[:8]}]"
 
     last_err: Optional[HTTPException] = None
     for attempt in range(1, UPSCALE_MAX_RETRIES + 1):
         recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
-        ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+        ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
         body = {
             "mediaId": req.mediaId,
             "targetResolution": req.targetResolution,
@@ -723,7 +822,7 @@ async def upscale_image(req: ImageUpscaleRequest):
                 token,
                 body,
                 timeout_s=300,
-                project_id=req.projectId,
+                project_id=project_id,
             )
             if attempt > 1:
                 logger.info(f"{tag} Upscale OK after {attempt} attempts")
@@ -778,7 +877,7 @@ async def generate_video(req: VideoGenerateRequest):
     - I2V-FL: startImageBase64 + endImageBase64 (first-last frame)
     - R2V: referenceImages (1-3 images, separate endpoint + V2 payload)
     """
-    token = _resolve_token(req.accessToken, req.projectId)
+    project_id, token = _pick_session(req.projectId, req.accessToken)
     is_r2v = bool(req.referenceImages)
 
     # --- Upload images ---
@@ -824,7 +923,7 @@ async def generate_video(req: VideoGenerateRequest):
 
     # --- Mint reCAPTCHA ---
     recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
@@ -874,7 +973,7 @@ async def generate_video(req: VideoGenerateRequest):
             "requests": [req_item],
         }
 
-    result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
+    result = await _flow_request("POST", endpoint, token, body, project_id=project_id)
 
     operations = _parse_video_response(result)
 
@@ -931,7 +1030,7 @@ async def generate_video_v2(req: VideoGenerateRequest):
     - Adds top-level `useV2ModelConfig: true` for all modes
     - Modes supported: T2V, I2V, I2V-FL, R2V
     """
-    token = _resolve_token(req.accessToken, req.projectId)
+    project_id, token = _pick_session(req.projectId, req.accessToken)
     is_r2v = bool(req.referenceImages)
 
     # --- Upload images ---
@@ -968,7 +1067,7 @@ async def generate_video_v2(req: VideoGenerateRequest):
                 end_media_id = uploaded[idx]
 
     recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
@@ -1010,7 +1109,79 @@ async def generate_video_v2(req: VideoGenerateRequest):
         "useV2ModelConfig": True,
     }
 
-    result = await _flow_request("POST", endpoint, token, body, project_id=req.projectId)
+    result = await _flow_request("POST", endpoint, token, body, project_id=project_id)
+
+    operations = _parse_video_response(result)
+
+    return {
+        "success": True,
+        "batchId": batch_id,
+        "operations": operations,
+        "remainingCredits": result.get("remainingCredits"),
+    }
+
+
+@router.post("/videos/edit")
+async def edit_video(req: VideoEditRequest):
+    """Edit existing video using Omni Flash (abra_edit).
+
+    Takes an existing video (videoMediaId) + optional reference images,
+    applies the prompt as an edit instruction.
+    Endpoint: video:batchAsyncGenerateVideoEditVideo
+    """
+    project_id, token = _pick_session(req.projectId, req.accessToken)
+
+    # Upload reference images if provided
+    ref_media_ids: list = []
+    if req.referenceImages:
+        upload_tasks = [
+            _upload_user_image(token, ref.base64, ref.aspectRatio, ref.mimeType)
+            for ref in req.referenceImages
+        ]
+        ref_media_ids = list(await asyncio.gather(*upload_tasks))
+
+    recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
+    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
+    batch_id = str(uuid.uuid4())
+
+    req_item: dict = {
+        "aspectRatio": req.aspectRatio,
+        "metadata": {},
+        "referenceAudio": [{"mediaId": req.referenceAudio}],
+        "referenceImages": [
+            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+            for mid in ref_media_ids
+        ],
+        "seed": seed,
+        "textInput": {
+            "structuredPrompt": {"parts": [{"text": req.promptText}]},
+        },
+        "videoInput": {
+            "mediaId": req.videoMediaId,
+            "startFrameIndex": req.startFrameIndex,
+            "endFrameIndex": req.endFrameIndex,
+        },
+        "videoModelKey": req.videoModelKey,
+    }
+
+    body = {
+        "clientContext": ctx,
+        "mediaGenerationContext": {
+            "batchId": batch_id,
+            "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
+        },
+        "requests": [req_item],
+        "useV2ModelConfig": True,
+    }
+
+    result = await _flow_request(
+        "POST",
+        f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoEditVideo",
+        token,
+        body,
+        project_id=project_id,
+    )
 
     operations = _parse_video_response(result)
 
@@ -1025,9 +1196,9 @@ async def generate_video_v2(req: VideoGenerateRequest):
 @router.post("/videos/upscale")
 async def upscale_video(req: VideoUpscaleRequest):
     """Upscale video to 1080p/4K. Returns operation for polling."""
-    token = _resolve_token(req.accessToken, req.projectId)
+    project_id, token = _pick_session(req.projectId, req.accessToken)
     recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
-    ctx = _client_context(req.projectId, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
@@ -1050,7 +1221,7 @@ async def upscale_video(req: VideoUpscaleRequest):
         f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoUpsampleVideo",
         token,
         body,
-        project_id=req.projectId,
+        project_id=project_id,
     )
 
     operations = []

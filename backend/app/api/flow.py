@@ -1,11 +1,13 @@
 """Flow API endpoints - Image/Video generation via Google Labs Flow."""
 from __future__ import annotations
 import asyncio
+import base64
 import json
 import logging
 import time
 import uuid
 from typing import Optional, List, Dict
+
 
 import aiohttp
 from fastapi import APIRouter, HTTPException
@@ -146,6 +148,14 @@ class ReferenceImage(BaseModel):
     aspectRatio: str = "IMAGE_ASPECT_RATIO_LANDSCAPE"
 
 
+class ReferenceVideo(BaseModel):
+    base64: str
+    mimeType: str = "video/mp4"
+
+
+OMNI_MODELS = {"abra_edit"}
+
+
 class VideoGenerateRequest(BaseModel):
     accessToken: str = ""
     projectId: str = "auto"
@@ -161,9 +171,13 @@ class VideoGenerateRequest(BaseModel):
     endImageBase64: Optional[str] = None
     endImageMimeType: str = "image/jpeg"
     endImageAspectRatio: str = "IMAGE_ASPECT_RATIO_LANDSCAPE"
-    # R2V: reference images (1-3), uses separate endpoint
+    # R2V / Edit: separate fields for images, videos, audio
     referenceImages: Optional[List[ReferenceImage]] = None
+    referenceVideos: Optional[List[ReferenceVideo]] = None
     referenceAudio: str = "zephyr"
+    # Edit Video: frame range (only used when referenceVideos present)
+    startFrameIndex: int = 0
+    endFrameIndex: int = 240
 
 
 class VideoEditRequest(BaseModel):
@@ -354,19 +368,27 @@ def _pick_session(project_id: str, access_token: str) -> tuple[str, str]:
     Returns (resolved_project_id, resolved_access_token).
     """
     if project_id and project_id != "auto" and project_id in _token_store:
-        # Explicit session requested
         token = _resolve_token(access_token, project_id)
         return project_id, token
 
-    # Auto-rotate: pick least recently used session
+    if project_id and project_id != "auto" and access_token:
+        return project_id, access_token
+
     picked_pid = _session_rotator.next()
     if picked_pid:
         stored = _token_store[picked_pid]
         logger.info(f"Auto-rotate: picked session {picked_pid[:8]}...")
         return picked_pid, stored.access_token
 
-    # Fallback: use whatever was provided
-    return project_id, access_token
+    if access_token:
+        return project_id, access_token
+
+    raise HTTPException(401, detail={
+        "success": False,
+        "error": "CREDENTIALS_MISSING",
+        "message": "Không có session nào. Truyền accessToken + projectId hoặc đăng ký session trước.",
+        "statusCode": 401,
+    })
 
 
 def _headers(access_token: str) -> dict:
@@ -441,13 +463,25 @@ def _parse_flow_error(text: str, status_code: int) -> tuple[str, str, bool]:
         elif status_code == 401:
             vi_msg = "Token xác thực hết hạn hoặc không hợp lệ"
         elif status_code == 403:
-            vi_msg = "Không có quyền truy cập"
+            if "unusual" in lower or "activity" in lower:
+                vi_msg = "IP bị đánh dấu hoạt động bất thường (captcha score thấp)"
+            else:
+                vi_msg = "Không có quyền truy cập"
+        elif status_code == 400:
+            if "invalid value" in lower and "aspect_ratio" in lower:
+                vi_msg = "aspectRatio không hợp lệ. Dùng VIDEO_ASPECT_RATIO_LANDSCAPE hoặc VIDEO_ASPECT_RATIO_PORTRAIT"
+            elif "unknown name" in lower:
+                vi_msg = f"Payload chứa field không hợp lệ: {text[:200]}"
+            else:
+                vi_msg = f"Request không hợp lệ: {text[:200]}"
         elif "upload" in lower:
-            vi_msg = "Lỗi upload ảnh"
+            vi_msg = "Lỗi upload media"
+        elif "video" in lower:
+            vi_msg = "Lỗi tạo video"
         elif "image" in lower:
             vi_msg = "Lỗi tạo ảnh"
         else:
-            vi_msg = "Lỗi tạo nội dung"
+            vi_msg = f"Lỗi tạo nội dung ({status_code})"
 
     return reason, vi_msg, is_retryable
 
@@ -973,7 +1007,6 @@ async def upload_video(req: VideoUploadRequest):
     Accepts base64-encoded video, uploads to Google via resumable upload.
     Returns mediaServerId to use as videoMediaId in /videos/edit.
     """
-    import base64
     project_id, token = _pick_session(req.projectId, req.accessToken)
     video_bytes = base64.b64decode(req.videoBase64)
     result = await _upload_video(token, project_id, video_bytes, req.mimeType)
@@ -992,24 +1025,83 @@ async def generate_video(req: VideoGenerateRequest):
     - T2V: no images, text prompt only
     - I2V: startImageBase64 only
     - I2V-FL: startImageBase64 + endImageBase64 (first-last frame)
-    - R2V: referenceImages (1-3 images, separate endpoint + V2 payload)
+    - R2V: referenceImages only (uses ReferenceImages endpoint)
+    - Edit Video: referenceVideos + optional referenceImages (Omni models only)
     """
     project_id, token = _pick_session(req.projectId, req.accessToken)
-    is_r2v = bool(req.referenceImages)
 
-    # --- Upload images ---
+    has_images = bool(req.referenceImages)
+    has_videos = bool(req.referenceVideos)
+    has_refs = has_images or has_videos
+    is_edit = has_videos
+
+    if not req.promptText.strip():
+        raise HTTPException(400, detail={
+            "success": False, "error": "INVALID_PROMPT",
+            "message": "promptText không được để trống", "statusCode": 400,
+        })
+
+    if has_videos and req.videoModelKey not in OMNI_MODELS:
+        raise HTTPException(400, detail={
+            "success": False, "error": "MODEL_NOT_SUPPORTED",
+            "message": (
+                f"referenceVideos chỉ hỗ trợ Omni models: {', '.join(OMNI_MODELS)}. "
+                f"Model hiện tại '{req.videoModelKey}' không hỗ trợ edit video. "
+                f"Đổi videoModelKey sang 'abra_edit' hoặc bỏ referenceVideos."
+            ),
+            "statusCode": 400,
+        })
+    if has_videos and len(req.referenceVideos) > 1:
+        raise HTTPException(400, detail={
+            "success": False, "error": "TOO_MANY_VIDEOS",
+            "message": "Chỉ hỗ trợ tối đa 1 video reference. Gửi 1 video trong referenceVideos.",
+            "statusCode": 400,
+        })
+
+    # --- Upload references ---
     upload_tasks: list = []
     start_media_id: Optional[str] = None
     end_media_id: Optional[str] = None
-    ref_media_ids: list = []
+    ref_image_media_ids: list = []
+    video_media_id: Optional[str] = None
 
-    if is_r2v:
-        for ref in req.referenceImages:
-            upload_tasks.append(
-                _upload_user_image(
-                    token, ref.base64, ref.aspectRatio, ref.mimeType,
-                )
+    if has_refs:
+        img_upload_tasks = [
+            _upload_user_image(token, ref.base64, ref.aspectRatio, ref.mimeType)
+            for ref in (req.referenceImages or [])
+        ]
+        vid_upload_tasks = []
+        if has_videos:
+            vid = req.referenceVideos[0]
+            try:
+                vid_bytes = base64.b64decode(vid.base64)
+            except Exception as e:
+                raise HTTPException(400, detail={
+                    "success": False, "error": "INVALID_VIDEO_BASE64",
+                    "message": f"Không thể decode base64 video: {e}",
+                    "statusCode": 400,
+                })
+            if len(vid_bytes) < 1000:
+                raise HTTPException(400, detail={
+                    "success": False, "error": "VIDEO_TOO_SMALL",
+                    "message": f"Video quá nhỏ ({len(vid_bytes)} bytes). Kiểm tra lại base64 data.",
+                    "statusCode": 400,
+                })
+            vid_upload_tasks.append(
+                _upload_video(token, project_id, vid_bytes, vid.mimeType)
             )
+
+        all_results = await asyncio.gather(*img_upload_tasks, *vid_upload_tasks)
+        ref_image_media_ids = list(all_results[:len(img_upload_tasks)])
+        if vid_upload_tasks:
+            vid_result = all_results[len(img_upload_tasks)]
+            video_media_id = vid_result.get("mediaId") or vid_result.get("mediaServerId")
+            if not video_media_id:
+                raise HTTPException(500, detail={
+                    "success": False, "error": "VIDEO_UPLOAD_NO_ID",
+                    "message": "Upload video thành công nhưng không nhận được mediaId từ Google.",
+                    "statusCode": 500,
+                })
     else:
         if req.startImageBase64:
             upload_tasks.append(
@@ -1025,12 +1117,8 @@ async def generate_video(req: VideoGenerateRequest):
                     req.endImageAspectRatio, req.endImageMimeType,
                 )
             )
-
-    if upload_tasks:
-        uploaded = await asyncio.gather(*upload_tasks)
-        if is_r2v:
-            ref_media_ids = list(uploaded)
-        else:
+        if upload_tasks:
+            uploaded = await asyncio.gather(*upload_tasks)
             idx = 0
             if req.startImageBase64:
                 start_media_id = uploaded[idx]
@@ -1044,9 +1132,39 @@ async def generate_video(req: VideoGenerateRequest):
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
-    if is_r2v:
-        # R2V: V2 payload with structuredPrompt, referenceImages, referenceAudio
+    if is_edit:
+        # Edit Video (Omni): video + optional image references
         req_item: dict = {
+            "aspectRatio": req.aspectRatio,
+            "metadata": {},
+            "referenceAudio": [{"mediaId": req.referenceAudio}],
+            "referenceImages": [
+                {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+                for mid in ref_image_media_ids
+            ],
+            "seed": seed,
+            "textInput": {
+                "structuredPrompt": {"parts": [{"text": req.promptText}]},
+            },
+            "videoInput": {
+                "mediaId": video_media_id,
+                "startFrameIndex": req.startFrameIndex,
+                "endFrameIndex": req.endFrameIndex,
+            },
+            "videoModelKey": req.videoModelKey,
+        }
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoEditVideo"
+        body = {
+            "clientContext": ctx,
+            "mediaGenerationContext": {
+                "batchId": batch_id,
+                "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
+            },
+            "requests": [req_item],
+        }
+    elif has_refs:
+        # R2V: image references only
+        req_item = {
             "aspectRatio": req.aspectRatio,
             "seed": seed,
             "textInput": {
@@ -1056,7 +1174,7 @@ async def generate_video(req: VideoGenerateRequest):
             "metadata": {},
             "referenceImages": [
                 {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
-                for mid in ref_media_ids
+                for mid in ref_image_media_ids
             ],
             "referenceAudio": [{"mediaId": req.referenceAudio}],
         }
@@ -1068,7 +1186,7 @@ async def generate_video(req: VideoGenerateRequest):
             "useV2ModelConfig": True,
         }
     else:
-        # T2V / I2V / I2V-FL: V1 payload with plain prompt
+        # T2V / I2V / I2V-FL
         req_item = {
             "aspectRatio": req.aspectRatio,
             "seed": seed,
@@ -1240,15 +1358,11 @@ async def generate_video_v2(req: VideoGenerateRequest):
 
 @router.post("/videos/edit")
 async def edit_video(req: VideoEditRequest):
-    """Edit existing video using Omni Flash (abra_edit).
-
-    Takes an existing video (videoMediaId) + optional reference images,
-    applies the prompt as an edit instruction.
-    Endpoint: video:batchAsyncGenerateVideoEditVideo
+    """Deprecated: use /videos/generate with video in referenceImages instead.
+    Kept for backward compatibility — accepts pre-uploaded videoMediaId.
     """
     project_id, token = _pick_session(req.projectId, req.accessToken)
 
-    # Upload reference images if provided
     ref_media_ids: list = []
     if req.referenceImages:
         upload_tasks = [
@@ -1294,13 +1408,9 @@ async def edit_video(req: VideoEditRequest):
     result = await _flow_request(
         "POST",
         f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoEditVideo",
-        token,
-        body,
-        project_id=project_id,
+        token, body, project_id=project_id,
     )
-
     operations = _parse_video_response(result)
-
     return {
         "success": True,
         "batchId": batch_id,

@@ -1,5 +1,6 @@
 """FlowCaptchaPT - Captcha Token Service."""
 import logging
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -8,6 +9,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from .config import settings
+from .version import APP_VERSION
+
+_start_time = time.time()
 from .database import init_db
 from .models import ProxySetting  # noqa: F401 — register model before create_all
 
@@ -60,8 +64,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="FlowCaptchaPT",
-    description="reCAPTCHA Enterprise Token Service",
-    version="1.0.0",
+    description="reCAPTCHA Enterprise Token Service + Google Labs Flow API Proxy",
+    version=APP_VERSION,
     lifespan=lifespan,
 )
 
@@ -91,7 +95,15 @@ app.include_router(flow_router)
 
 @app.get("/api/health")
 async def health():
-    return {"status": "ok", "version": "1.0.0"}
+    uptime_s = int(time.time() - _start_time)
+    hours, remainder = divmod(uptime_s, 3600)
+    minutes, secs = divmod(remainder, 60)
+    return {
+        "status": "ok",
+        "version": APP_VERSION,
+        "uptime": f"{hours}h{minutes}m{secs}s",
+        "uptime_seconds": uptime_s,
+    }
 
 
 # Serve frontend static files at /ui/

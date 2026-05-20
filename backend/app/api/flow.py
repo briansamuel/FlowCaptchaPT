@@ -746,11 +746,21 @@ async def _upload_video(
                 logger.error(f"{tag} Upload video failed: {resp.status} {text[:300]}")
                 raise HTTPException(resp.status, f"Upload video failed: {resp.status}")
             upload_data = await resp.json()
-            media_id = upload_data.get("mediaServerId")
+            media_id = (
+                upload_data.get("mediaId")
+                or upload_data.get("mediaServerId")
+                or upload_data.get("media", {}).get("name")
+            )
             if not media_id:
-                raise HTTPException(500, "Upload video: no mediaServerId in response")
+                logger.error(f"{tag} Upload video: no mediaId in response: {str(upload_data)[:300]}")
+                raise HTTPException(500, detail={
+                    "success": False, "error": "VIDEO_UPLOAD_NO_ID",
+                    "message": "Upload video thành công nhưng không nhận được mediaId từ Google.",
+                    "statusCode": 500,
+                })
+            upload_data["mediaId"] = media_id
             logger.info(
-                f"{tag} Video uploaded: mediaServerId={media_id} "
+                f"{tag} Video uploaded: mediaId={media_id} "
                 f"w={upload_data.get('videoWidth')} h={upload_data.get('videoHeight')}"
             )
             return upload_data

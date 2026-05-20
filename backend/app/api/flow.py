@@ -633,8 +633,7 @@ async def _upload_user_image(
     return media_id
 
 
-UPLOAD_VIDEO_START = "https://labs.google/fx/api/upload-video?action=start"
-UPLOAD_VIDEO_UPLOAD = "https://labs.google/fx/api/upload-video?action=upload"
+UPLOAD_VIDEO_BASE = "https://aisandbox-pa.sandbox.googleapis.com/upload/v1/flow/upload/video"
 
 
 async def _upload_video(
@@ -643,10 +642,10 @@ async def _upload_video(
     video_bytes: bytes,
     mime_type: str = "video/mp4",
 ) -> dict:
-    """Upload video via Google Labs 2-step resumable upload.
+    """Upload video via Google resumable upload.
 
-    Step 1: POST start → get sessionUrl
-    Step 2: PUT binary to sessionUrl → get mediaServerId
+    Step 1: POST initiate → get resumable sessionUrl
+    Step 2: POST binary with upload,finalize → get mediaServerId
     Returns {mediaServerId, workflowServerId, videoWidth, videoHeight}
     """
     tag = f"[{project_id[:8]}]"
@@ -655,58 +654,67 @@ async def _upload_video(
     if proxy_entry and ProxyConnector:
         connector = ProxyConnector.from_url(proxy_entry.url)
 
-    upload_headers = {
+    common_headers = {
         "Authorization": f"Bearer {access_token}",
-        "Content-Type": "application/json",
         "Origin": "https://labs.google",
         "Referer": "https://labs.google/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Cookie": f"__Secure-labs_AID={access_token[:20]}",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/137.0.0.0 Safari/537.36",
     }
 
     async with aiohttp.ClientSession(connector=connector) as session:
-        # Step 1: Start upload session
-        start_body = {
-            "projectId": project_id,
-            "mimeType": mime_type,
+        # Step 1: Initiate resumable upload
+        init_url = f"{UPLOAD_VIDEO_BASE}/{project_id}?upload_protocol=resumable"
+        init_headers = {
+            **common_headers,
+            "Content-Type": "application/json",
+            "X-Goog-Upload-Protocol": "resumable",
+            "X-Goog-Upload-Command": "start",
+            "X-Goog-Upload-Header-Content-Type": mime_type,
+            "X-Goog-Upload-Header-Content-Length": str(len(video_bytes)),
         }
         async with session.post(
-            UPLOAD_VIDEO_START,
-            headers=upload_headers,
-            json=start_body,
+            init_url,
+            headers=init_headers,
+            json={},
             timeout=aiohttp.ClientTimeout(total=30),
         ) as resp:
-            if resp.status != 200:
+            if resp.status not in (200, 308):
                 text = await resp.text()
-                logger.error(f"{tag} Upload video start failed: {resp.status} {text[:300]}")
-                raise HTTPException(resp.status, f"Upload video start failed: {resp.status}")
-            start_data = await resp.json()
-            session_url = start_data.get("sessionUrl")
+                logger.error(f"{tag} Upload video init failed: {resp.status} {text[:300]}")
+                raise HTTPException(resp.status, f"Upload video init failed: {resp.status}")
+            session_url = resp.headers.get("X-Goog-Upload-URL") or resp.headers.get("Location")
             if not session_url:
-                raise HTTPException(500, "Upload video start: no sessionUrl")
+                # Fallback: check JSON body
+                try:
+                    data = await resp.json()
+                    session_url = data.get("sessionUrl")
+                except Exception:
+                    pass
+            if not session_url:
+                raise HTTPException(500, "Upload video init: no session URL in response")
             logger.info(f"{tag} Upload video session started, size={len(video_bytes)}")
 
-        # Step 2: Upload binary to sessionUrl
-        put_headers = {
+        # Step 2: Upload binary to sessionUrl (POST with Google upload headers)
+        upload_headers = {
+            **common_headers,
             "Content-Type": mime_type,
-            "Origin": "https://labs.google",
-            "Referer": "https://labs.google/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "X-Goog-Upload-Command": "upload, finalize",
+            "X-Goog-Upload-Offset": "0",
         }
-        async with session.put(
+        async with session.post(
             session_url,
-            headers=put_headers,
+            headers=upload_headers,
             data=video_bytes,
             timeout=aiohttp.ClientTimeout(total=300),
         ) as resp:
             if resp.status != 200:
                 text = await resp.text()
-                logger.error(f"{tag} Upload video PUT failed: {resp.status} {text[:300]}")
+                logger.error(f"{tag} Upload video failed: {resp.status} {text[:300]}")
                 raise HTTPException(resp.status, f"Upload video failed: {resp.status}")
             upload_data = await resp.json()
             media_id = upload_data.get("mediaServerId")
             if not media_id:
-                raise HTTPException(500, "Upload video: no mediaServerId")
+                raise HTTPException(500, "Upload video: no mediaServerId in response")
             logger.info(
                 f"{tag} Video uploaded: mediaServerId={media_id} "
                 f"w={upload_data.get('videoWidth')} h={upload_data.get('videoHeight')}"

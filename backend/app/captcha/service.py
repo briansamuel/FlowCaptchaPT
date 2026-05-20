@@ -298,7 +298,7 @@ class CaptchaService:
             await asyncio.sleep(0.5)
 
         # Let page fully settle (SPA hydration, Next.js client-side routing)
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
         # Single evaluate: check if reCAPTCHA loaded, inject if not, then wait
         bootstrap_js = f"""
@@ -402,10 +402,12 @@ class CaptchaService:
             # Simple wait before mint
             effective_delay = min(wait_delay, 5) if tab_reused else min(wait_delay, 10)
             if effective_delay > 0:
-                logger.debug(f"Slot {slot}: waiting {effective_delay}s (reused={tab_reused})")
+                logger.info(f"Slot {slot}: waiting {effective_delay}s before mint (reused={tab_reused})")
                 await asyncio.sleep(effective_delay)
 
-            # --- Token mint: single evaluate call ---
+            logger.info(f"Slot {slot}: minting {action} token...")
+
+            # --- Token mint: single evaluate call with JS-level timeout ---
             token_script = f"""
                 (async () => {{
                     if (typeof grecaptcha === 'undefined' || !grecaptcha.enterprise
@@ -413,9 +415,14 @@ class CaptchaService:
                         return JSON.stringify({{ success: false, error: 'grecaptcha not available' }});
                     }}
                     try {{
-                        const token = await grecaptcha.enterprise.execute(
-                            '{SITE_KEY}', {{ action: '{action}' }}
-                        );
+                        const token = await Promise.race([
+                            grecaptcha.enterprise.execute(
+                                '{SITE_KEY}', {{ action: '{action}' }}
+                            ),
+                            new Promise((_, reject) =>
+                                setTimeout(() => reject(new Error('grecaptcha.execute timeout 20s')), 20000)
+                            )
+                        ]);
                         if (!token) return JSON.stringify({{ success: false, error: 'empty token' }});
                         return JSON.stringify({{ success: true, token: token }});
                     }} catch (e) {{
@@ -428,10 +435,13 @@ class CaptchaService:
             max_attempts = 3
             for attempt in range(max_attempts):
                 try:
-                    raw = await page.evaluate(token_script, timeout=45)
+                    t0 = _time.time()
+                    raw = await page.evaluate(token_script, timeout=30)
+                    logger.info(f"Slot {slot} attempt {attempt+1}: evaluate done in {_time.time()-t0:.1f}s")
                 except Exception as eval_err:
+                    logger.warning(f"Slot {slot} attempt {attempt+1}: evaluate STUCK/failed after {_time.time()-t0:.1f}s: {eval_err}")
                     if attempt < max_attempts - 1:
-                        logger.warning(f"Slot {slot} attempt {attempt+1}: evaluate exception: {eval_err}")
+                        logger.warning(f"Slot {slot} attempt {attempt+1}: recreating tab...")
                         # Close failed tab before creating new one
                         old_tab = self._warm_tabs.get(slot)
                         if old_tab and cdp:

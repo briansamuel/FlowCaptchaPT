@@ -182,6 +182,14 @@ class VideoEditRequest(BaseModel):
     referenceAudio: str = "zephyr"
 
 
+class VideoUploadRequest(BaseModel):
+    accessToken: str = ""
+    projectId: str = "auto"
+    videoBase64: str
+    mimeType: str = "video/mp4"
+    fileName: Optional[str] = None
+
+
 class VideoUpscaleRequest(BaseModel):
     accessToken: str
     projectId: str
@@ -625,6 +633,87 @@ async def _upload_user_image(
     return media_id
 
 
+UPLOAD_VIDEO_START = "https://labs.google/fx/api/upload-video?action=start"
+UPLOAD_VIDEO_UPLOAD = "https://labs.google/fx/api/upload-video?action=upload"
+
+
+async def _upload_video(
+    access_token: str,
+    project_id: str,
+    video_bytes: bytes,
+    mime_type: str = "video/mp4",
+) -> dict:
+    """Upload video via Google Labs 2-step resumable upload.
+
+    Step 1: POST start → get sessionUrl
+    Step 2: PUT binary to sessionUrl → get mediaServerId
+    Returns {mediaServerId, workflowServerId, videoWidth, videoHeight}
+    """
+    tag = f"[{project_id[:8]}]"
+    connector = None
+    proxy_entry = proxy_pool.next()
+    if proxy_entry and ProxyConnector:
+        connector = ProxyConnector.from_url(proxy_entry.url)
+
+    upload_headers = {
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Origin": "https://labs.google",
+        "Referer": "https://labs.google/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Cookie": f"__Secure-labs_AID={access_token[:20]}",
+    }
+
+    async with aiohttp.ClientSession(connector=connector) as session:
+        # Step 1: Start upload session
+        start_body = {
+            "projectId": project_id,
+            "mimeType": mime_type,
+        }
+        async with session.post(
+            UPLOAD_VIDEO_START,
+            headers=upload_headers,
+            json=start_body,
+            timeout=aiohttp.ClientTimeout(total=30),
+        ) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"{tag} Upload video start failed: {resp.status} {text[:300]}")
+                raise HTTPException(resp.status, f"Upload video start failed: {resp.status}")
+            start_data = await resp.json()
+            session_url = start_data.get("sessionUrl")
+            if not session_url:
+                raise HTTPException(500, "Upload video start: no sessionUrl")
+            logger.info(f"{tag} Upload video session started, size={len(video_bytes)}")
+
+        # Step 2: Upload binary to sessionUrl
+        put_headers = {
+            "Content-Type": mime_type,
+            "Origin": "https://labs.google",
+            "Referer": "https://labs.google/",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        }
+        async with session.put(
+            session_url,
+            headers=put_headers,
+            data=video_bytes,
+            timeout=aiohttp.ClientTimeout(total=300),
+        ) as resp:
+            if resp.status != 200:
+                text = await resp.text()
+                logger.error(f"{tag} Upload video PUT failed: {resp.status} {text[:300]}")
+                raise HTTPException(resp.status, f"Upload video failed: {resp.status}")
+            upload_data = await resp.json()
+            media_id = upload_data.get("mediaServerId")
+            if not media_id:
+                raise HTTPException(500, "Upload video: no mediaServerId")
+            logger.info(
+                f"{tag} Video uploaded: mediaServerId={media_id} "
+                f"w={upload_data.get('videoWidth')} h={upload_data.get('videoHeight')}"
+            )
+            return upload_data
+
+
 # ---------------------------------------------------------------------------
 # Image endpoints
 # ---------------------------------------------------------------------------
@@ -868,6 +957,26 @@ async def upscale_image(req: ImageUpscaleRequest):
 # ---------------------------------------------------------------------------
 # Video endpoints
 # ---------------------------------------------------------------------------
+
+@router.post("/videos/upload")
+async def upload_video(req: VideoUploadRequest):
+    """Upload a video file for use with Edit Video (abra_edit).
+
+    Accepts base64-encoded video, uploads to Google via resumable upload.
+    Returns mediaServerId to use as videoMediaId in /videos/edit.
+    """
+    import base64
+    project_id, token = _pick_session(req.projectId, req.accessToken)
+    video_bytes = base64.b64decode(req.videoBase64)
+    result = await _upload_video(token, project_id, video_bytes, req.mimeType)
+    return {
+        "success": True,
+        "mediaServerId": result.get("mediaServerId"),
+        "workflowServerId": result.get("workflowServerId"),
+        "videoWidth": result.get("videoWidth"),
+        "videoHeight": result.get("videoHeight"),
+    }
+
 
 @router.post("/videos/generate")
 async def generate_video(req: VideoGenerateRequest):
@@ -1172,7 +1281,6 @@ async def edit_video(req: VideoEditRequest):
             "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
         },
         "requests": [req_item],
-        "useV2ModelConfig": True,
     }
 
     result = await _flow_request(

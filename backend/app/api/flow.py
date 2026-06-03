@@ -174,7 +174,7 @@ class VideoGenerateRequest(BaseModel):
     # R2V / Edit: separate fields for images, videos, audio
     referenceImages: Optional[List[ReferenceImage]] = None
     referenceVideos: Optional[List[ReferenceVideo]] = None
-    referenceAudio: str = "zephyr"
+    referenceAudio: Optional[str] = None
     # Edit Video: frame range (only used when referenceVideos present)
     startFrameIndex: int = 0
     endFrameIndex: int = 240
@@ -193,7 +193,7 @@ class VideoEditRequest(BaseModel):
     endFrameIndex: int = 240
     # Reference images (optional, 1-3)
     referenceImages: Optional[List[ReferenceImage]] = None
-    referenceAudio: str = "zephyr"
+    referenceAudio: Optional[str] = None
 
 
 class VideoUploadRequest(BaseModel):
@@ -1147,7 +1147,6 @@ async def generate_video(req: VideoGenerateRequest):
         req_item: dict = {
             "aspectRatio": req.aspectRatio,
             "metadata": {},
-            "referenceAudio": [{"mediaId": req.referenceAudio}],
             "referenceImages": [
                 {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
                 for mid in ref_image_media_ids
@@ -1163,6 +1162,8 @@ async def generate_video(req: VideoGenerateRequest):
             },
             "videoModelKey": req.videoModelKey,
         }
+        if req.referenceAudio:
+            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
         endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoEditVideo"
         body = {
             "clientContext": ctx,
@@ -1186,8 +1187,9 @@ async def generate_video(req: VideoGenerateRequest):
                 {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
                 for mid in ref_image_media_ids
             ],
-            "referenceAudio": [{"mediaId": req.referenceAudio}],
         }
+        if req.referenceAudio:
+            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
         endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoReferenceImages"
         body = {
             "mediaGenerationContext": {"batchId": batch_id},
@@ -1332,7 +1334,8 @@ async def generate_video_v2(req: VideoGenerateRequest):
             {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
             for mid in ref_media_ids
         ]
-        req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
+        if req.referenceAudio:
+            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
         endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoReferenceImages"
     elif start_media_id and end_media_id:
         req_item["startImage"] = {"mediaId": start_media_id}
@@ -1389,7 +1392,6 @@ async def edit_video(req: VideoEditRequest):
     req_item: dict = {
         "aspectRatio": req.aspectRatio,
         "metadata": {},
-        "referenceAudio": [{"mediaId": req.referenceAudio}],
         "referenceImages": [
             {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
             for mid in ref_media_ids
@@ -1405,6 +1407,8 @@ async def edit_video(req: VideoEditRequest):
         },
         "videoModelKey": req.videoModelKey,
     }
+    if req.referenceAudio:
+        req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
 
     body = {
         "clientContext": ctx,

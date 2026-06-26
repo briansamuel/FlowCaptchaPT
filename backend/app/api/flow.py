@@ -1035,12 +1035,11 @@ async def upload_video(req: VideoUploadRequest):
 
 @router.post("/videos/generate")
 async def generate_video(req: VideoGenerateRequest):
-    """Generate video. Modes:
-    - T2V: no images, text prompt only
-    - I2V: startImageBase64 only
-    - I2V-FL: startImageBase64 + endImageBase64 (first-last frame)
-    - R2V: referenceImages only (uses ReferenceImages endpoint)
-    - Edit Video: referenceVideos + optional referenceImages (Omni models only)
+    """Generate video (V2 payload — matches current web UI).
+
+    Modes: T2V, I2V, I2V-FL, R2V, Edit Video.
+    Uses structuredPrompt, mediaGenerationContext, useV2ModelConfig,
+    and flow/uploadImage (UUID mediaId) for all image uploads.
     """
     project_id, token = _pick_session(req.projectId, req.accessToken)
 
@@ -1072,7 +1071,163 @@ async def generate_video(req: VideoGenerateRequest):
             "statusCode": 400,
         })
 
-    # --- Upload references ---
+    # --- Upload references (UUID mediaId via flow/uploadImage) ---
+    upload_tasks: list = []
+    start_media_id: Optional[str] = None
+    end_media_id: Optional[str] = None
+    ref_image_media_ids: list = []
+    video_media_id: Optional[str] = None
+
+    if has_refs:
+        img_upload_tasks = [
+            _upload_reference_image(token, project_id, ref.base64, ref.mimeType)
+            for ref in (req.referenceImages or [])
+        ]
+        vid_upload_tasks = []
+        if has_videos:
+            vid = req.referenceVideos[0]
+            try:
+                vid_bytes = base64.b64decode(vid.base64)
+            except Exception as e:
+                raise HTTPException(400, detail={
+                    "success": False, "error": "INVALID_VIDEO_BASE64",
+                    "message": f"Không thể decode base64 video: {e}",
+                    "statusCode": 400,
+                })
+            if len(vid_bytes) < 1000:
+                raise HTTPException(400, detail={
+                    "success": False, "error": "VIDEO_TOO_SMALL",
+                    "message": f"Video quá nhỏ ({len(vid_bytes)} bytes). Kiểm tra lại base64 data.",
+                    "statusCode": 400,
+                })
+            vid_upload_tasks.append(
+                _upload_video(token, project_id, vid_bytes, vid.mimeType)
+            )
+
+        all_results = await asyncio.gather(*img_upload_tasks, *vid_upload_tasks)
+        ref_image_media_ids = list(all_results[:len(img_upload_tasks)])
+        if vid_upload_tasks:
+            vid_result = all_results[len(img_upload_tasks)]
+            video_media_id = vid_result.get("mediaId") or vid_result.get("mediaServerId")
+            if not video_media_id:
+                raise HTTPException(500, detail={
+                    "success": False, "error": "VIDEO_UPLOAD_NO_ID",
+                    "message": "Upload video thành công nhưng không nhận được mediaId từ Google.",
+                    "statusCode": 500,
+                })
+    else:
+        # I2V / I2V-FL: flow/uploadImage → UUID mediaId
+        if req.startImageBase64:
+            upload_tasks.append(
+                _upload_reference_image(
+                    token, project_id, req.startImageBase64, req.startImageMimeType,
+                )
+            )
+        if req.endImageBase64:
+            upload_tasks.append(
+                _upload_reference_image(
+                    token, project_id, req.endImageBase64, req.endImageMimeType,
+                )
+            )
+        if upload_tasks:
+            uploaded = await asyncio.gather(*upload_tasks)
+            idx = 0
+            if req.startImageBase64:
+                start_media_id = uploaded[idx]
+                idx += 1
+            if req.endImageBase64:
+                end_media_id = uploaded[idx]
+
+    # --- Mint reCAPTCHA ---
+    recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
+    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
+    seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
+    batch_id = str(uuid.uuid4())
+
+    # --- Build request item (V2: structuredPrompt for all modes) ---
+    req_item: dict = {
+        "aspectRatio": req.aspectRatio,
+        "metadata": {},
+        "seed": seed,
+        "textInput": {
+            "structuredPrompt": {"parts": [{"text": req.promptText}]},
+        },
+        "videoModelKey": req.videoModelKey,
+    }
+
+    if is_edit:
+        req_item["referenceImages"] = [
+            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+            for mid in ref_image_media_ids
+        ]
+        req_item["videoInput"] = {
+            "mediaId": video_media_id,
+            "startFrameIndex": req.startFrameIndex,
+            "endFrameIndex": req.endFrameIndex,
+        }
+        if req.referenceAudio:
+            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoEditVideo"
+    elif has_refs:
+        req_item["referenceImages"] = [
+            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+            for mid in ref_image_media_ids
+        ]
+        if req.referenceAudio:
+            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoReferenceImages"
+    elif start_media_id and end_media_id:
+        req_item["startImage"] = {"mediaId": start_media_id}
+        req_item["endImage"] = {"mediaId": end_media_id}
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartAndEndImage"
+    elif start_media_id:
+        req_item["startImage"] = {"mediaId": start_media_id}
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartImage"
+    else:
+        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoText"
+
+    body = {
+        "clientContext": ctx,
+        "mediaGenerationContext": {
+            "batchId": batch_id,
+            "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
+        },
+        "requests": [req_item],
+        "useV2ModelConfig": True,
+    }
+
+    result = await _flow_request("POST", endpoint, token, body, project_id=project_id)
+
+    operations = _parse_video_response(result)
+
+    return {
+        "success": True,
+        "batchId": batch_id,
+        "operations": operations,
+        "remainingCredits": result.get("remainingCredits"),
+    }
+
+
+@router.post("/videos/generate-v1")
+async def generate_video_v1_legacy(req: VideoGenerateRequest):
+    """Legacy V1 payload format (old prompt format, :uploadUserImage).
+
+    Kept for backward compatibility. New clients should use /videos/generate.
+    """
+    project_id, token = _pick_session(req.projectId, req.accessToken)
+
+    has_images = bool(req.referenceImages)
+    has_videos = bool(req.referenceVideos)
+    has_refs = has_images or has_videos
+    is_edit = has_videos
+
+    if not req.promptText.strip():
+        raise HTTPException(400, detail={
+            "success": False, "error": "INVALID_PROMPT",
+            "message": "promptText không được để trống", "statusCode": 400,
+        })
+
+    # --- Upload references (legacy: :uploadUserImage) ---
     upload_tasks: list = []
     start_media_id: Optional[str] = None
     end_media_id: Optional[str] = None
@@ -1093,12 +1248,6 @@ async def generate_video(req: VideoGenerateRequest):
                 raise HTTPException(400, detail={
                     "success": False, "error": "INVALID_VIDEO_BASE64",
                     "message": f"Không thể decode base64 video: {e}",
-                    "statusCode": 400,
-                })
-            if len(vid_bytes) < 1000:
-                raise HTTPException(400, detail={
-                    "success": False, "error": "VIDEO_TOO_SMALL",
-                    "message": f"Video quá nhỏ ({len(vid_bytes)} bytes). Kiểm tra lại base64 data.",
                     "statusCode": 400,
                 })
             vid_upload_tasks.append(
@@ -1140,14 +1289,12 @@ async def generate_video(req: VideoGenerateRequest):
             if req.endImageBase64:
                 end_media_id = uploaded[idx]
 
-    # --- Mint reCAPTCHA ---
     recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
     ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
     seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
     batch_id = str(uuid.uuid4())
 
     if is_edit:
-        # Edit Video (Omni): video + optional image references
         req_item: dict = {
             "aspectRatio": req.aspectRatio,
             "metadata": {},
@@ -1178,7 +1325,6 @@ async def generate_video(req: VideoGenerateRequest):
             "requests": [req_item],
         }
     elif has_refs:
-        # R2V: image references only
         req_item = {
             "aspectRatio": req.aspectRatio,
             "seed": seed,
@@ -1202,7 +1348,6 @@ async def generate_video(req: VideoGenerateRequest):
             "useV2ModelConfig": True,
         }
     else:
-        # T2V / I2V / I2V-FL
         req_item = {
             "aspectRatio": req.aspectRatio,
             "seed": seed,
@@ -1273,109 +1418,8 @@ def _parse_video_response(result: dict) -> list:
 
 @router.post("/videos/generate-v2")
 async def generate_video_v2(req: VideoGenerateRequest):
-    """Generate video with V2 payload schema (matches current web UI).
-
-    Differences from /videos/generate:
-    - Uses `structuredPrompt: {parts: [{text}]}` instead of `prompt`
-    - Adds `mediaGenerationContext.audioFailurePreference = "BLOCK_SILENCED_VIDEOS"`
-    - Adds top-level `useV2ModelConfig: true` for all modes
-    - Modes supported: T2V, I2V, I2V-FL, R2V
-    """
-    project_id, token = _pick_session(req.projectId, req.accessToken)
-    is_r2v = bool(req.referenceImages)
-
-    # --- Upload images ---
-    upload_tasks: list = []
-    start_media_id: Optional[str] = None
-    end_media_id: Optional[str] = None
-    ref_media_ids: list = []
-
-    if is_r2v:
-        for ref in req.referenceImages:
-            upload_tasks.append(
-                _upload_reference_image(token, project_id, ref.base64, ref.mimeType)
-            )
-    else:
-        # I2V / I2V-FL: use flow/uploadImage → UUID mediaId (matches web UI)
-        if req.startImageBase64:
-            upload_tasks.append(
-                _upload_reference_image(
-                    token, project_id, req.startImageBase64, req.startImageMimeType,
-                )
-            )
-        if req.endImageBase64:
-            upload_tasks.append(
-                _upload_reference_image(
-                    token, project_id, req.endImageBase64, req.endImageMimeType,
-                )
-            )
-
-    if upload_tasks:
-        uploaded = await asyncio.gather(*upload_tasks)
-        if is_r2v:
-            ref_media_ids = list(uploaded)
-        else:
-            idx = 0
-            if req.startImageBase64:
-                start_media_id = uploaded[idx]
-                idx += 1
-            if req.endImageBase64:
-                end_media_id = uploaded[idx]
-
-    recaptcha = await _mint_recaptcha("VIDEO_GENERATION")
-    ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
-    seed = req.seed if req.seed is not None else int(time.time() * 1000) % 1000000
-    batch_id = str(uuid.uuid4())
-
-    # V2 request item — always uses structuredPrompt
-    req_item: dict = {
-        "aspectRatio": req.aspectRatio,
-        "metadata": {},
-        "seed": seed,
-        "textInput": {
-            "structuredPrompt": {"parts": [{"text": req.promptText}]},
-        },
-        "videoModelKey": req.videoModelKey,
-    }
-
-    if is_r2v:
-        req_item["referenceImages"] = [
-            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
-            for mid in ref_media_ids
-        ]
-        if req.referenceAudio:
-            req_item["referenceAudio"] = [{"mediaId": req.referenceAudio}]
-        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoReferenceImages"
-    elif start_media_id and end_media_id:
-        req_item["startImage"] = {"mediaId": start_media_id}
-        req_item["endImage"] = {"mediaId": end_media_id}
-        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartAndEndImage"
-    elif start_media_id:
-        req_item["startImage"] = {"mediaId": start_media_id}
-        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoStartImage"
-    else:
-        endpoint = f"{FLOW_API_BASE}/video:batchAsyncGenerateVideoText"
-
-    body = {
-        "clientContext": ctx,
-        "mediaGenerationContext": {
-            "batchId": batch_id,
-            "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
-        },
-        "requests": [req_item],
-        "useV2ModelConfig": True,
-    }
-
-    result = await _flow_request("POST", endpoint, token, body, project_id=project_id)
-
-    operations = _parse_video_response(result)
-
-    return {
-        "success": True,
-        "batchId": batch_id,
-        "operations": operations,
-        "remainingCredits": result.get("remainingCredits"),
-    }
+    """Alias for /videos/generate (kept for backward compatibility)."""
+    return await generate_video(req)
 
 
 @router.post("/videos/edit")

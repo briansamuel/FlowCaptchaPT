@@ -947,13 +947,17 @@ async def upscale_image(req: ImageUpscaleRequest):
     project_id, token = _pick_session(req.projectId, req.accessToken)
     tag = f"[{project_id[:8]}]"
 
+    resolution = req.targetResolution
+    if resolution and not resolution.startswith("UPSAMPLE_IMAGE_"):
+        resolution = f"UPSAMPLE_IMAGE_{resolution}"
+
     last_err: Optional[HTTPException] = None
     for attempt in range(1, UPSCALE_MAX_RETRIES + 1):
         recaptcha = await _mint_recaptcha("IMAGE_GENERATION")
         ctx = _client_context(project_id, recaptcha, paygate_tier="PAYGATE_TIER_TWO")
         body = {
             "mediaId": req.mediaId,
-            "targetResolution": req.targetResolution,
+            "targetResolution": resolution,
             "clientContext": ctx,
         }
         try:
@@ -1289,16 +1293,21 @@ async def generate_video_v2(req: VideoGenerateRequest):
     if is_r2v:
         for ref in req.referenceImages:
             upload_tasks.append(
-                _upload_user_image(token, ref.base64, ref.aspectRatio, ref.mimeType)
+                _upload_reference_image(token, project_id, ref.base64, ref.mimeType)
             )
     else:
+        # I2V / I2V-FL: use flow/uploadImage → UUID mediaId (matches web UI)
         if req.startImageBase64:
             upload_tasks.append(
-                _upload_user_image(token, req.startImageBase64, req.startImageAspectRatio, req.startImageMimeType)
+                _upload_reference_image(
+                    token, project_id, req.startImageBase64, req.startImageMimeType,
+                )
             )
         if req.endImageBase64:
             upload_tasks.append(
-                _upload_user_image(token, req.endImageBase64, req.endImageAspectRatio, req.endImageMimeType)
+                _upload_reference_image(
+                    token, project_id, req.endImageBase64, req.endImageMimeType,
+                )
             )
 
     if upload_tasks:

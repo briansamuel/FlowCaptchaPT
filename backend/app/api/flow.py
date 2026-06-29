@@ -1193,8 +1193,9 @@ async def generate_video(req: VideoGenerateRequest):
             "audioFailurePreference": "BLOCK_SILENCED_VIDEOS",
         },
         "requests": [req_item],
-        "useV2ModelConfig": True,
     }
+    if not is_edit:
+        body["useV2ModelConfig"] = True
 
     result = await _flow_request("POST", endpoint, token, body, project_id=project_id)
 

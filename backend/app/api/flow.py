@@ -1156,10 +1156,11 @@ async def generate_video(req: VideoGenerateRequest):
     }
 
     if is_edit:
-        req_item["referenceImages"] = [
-            {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
-            for mid in ref_image_media_ids
-        ]
+        if ref_image_media_ids:
+            req_item["referenceImages"] = [
+                {"mediaId": mid, "imageUsageType": "IMAGE_USAGE_TYPE_ASSET"}
+                for mid in ref_image_media_ids
+            ]
         req_item["videoInput"] = {
             "mediaId": video_media_id,
             "startFrameIndex": req.startFrameIndex,

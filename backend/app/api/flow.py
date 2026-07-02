@@ -1498,7 +1498,7 @@ async def upscale_video(req: VideoUpscaleRequest):
     batch_id = str(uuid.uuid4())
 
     body = {
-        "mediaGenerationContext": {"batchId": batch_id},
+        "mediaGenerationContext": {"batchId": batch_id, "audioFailurePreference": "BLOCK_SILENCED_VIDEOS"},
         "clientContext": ctx,
         "requests": [{
             "resolution": req.resolution,
